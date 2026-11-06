@@ -66,3 +66,11 @@ def test_flujo_de_captura_asistida(app):
 def test_captura_asistida_solo_para_administradores(app):
     for rol in ("comprador", "vendedor"):
         assert cliente_con_rol(app, rol).get("/admin/dataset/anuncio").status_code in (302, 403)
+
+
+def test_precio_y_area_juntos_no_se_mezclan():
+    r = analizar_anuncio("Casa en Yanahuara S/ 950,000 220 m² construidos 4 dorm. 3 baños 10 años de antigüedad")
+    assert r["precio"] == "950000" and r["valores"]["area_construida"] == "220"
+    r = analizar_anuncio("Casa en Paucarpata S/. 430 000 140 m2, 4 dormitorios, 2 baños, 15 años de antigüedad")
+    assert r["precio"] == "430000" and r["valores"]["area_construida"] == "140"
+    assert analizar_anuncio("Casa en Cayma 120 m2 S/ 1 050 000")["precio"] == "1050000"

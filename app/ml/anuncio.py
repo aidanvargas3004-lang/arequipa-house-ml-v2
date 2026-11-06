@@ -14,7 +14,7 @@ from .schema import _DISTRITOS, _TIPOS, norm
 
 TIPO_CAMBIO_REFERENCIAL = 3.75  # S/ por US$; el administrador puede cambiarlo
 
-_NUM = r"(\d{1,3}(?:[.,\s]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)"
+_NUM = r"(?<![\d.,])(\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?|\d{1,3}(?: \d{3})+(?!\d)(?!\s*(?:m2|m²))|\d+(?:[.,]\d+)?)"
 
 # palabra clave → campo booleano (se busca sobre el texto sin tildes)
 _EXTRAS = {
