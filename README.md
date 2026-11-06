@@ -58,6 +58,8 @@ Copia `.env.example` a `.env` para ajustar variables (`SECRET_KEY`, `DATABASE_UR
 
 Para usar datos reales: **Administración → Dataset → Importar CSV** (marca «Reemplazar los datos sintéticos») y luego **Modelos ML → Entrenar nueva versión**. Mientras entrena (en segundo plano), el modelo activo sigue atendiendo estimaciones.
 
+**Captura asistida:** en **Dataset → Capturar desde un anuncio** pegas el texto de un anuncio real, el sistema propone los datos (tipo, distrito, áreas, habitaciones, precio, extras…) y tú los revisas antes de guardarlos con origen «Anuncio de portal». No visita ningún sitio web ni hace scraping; respeta los términos de uso del portal y no pegues datos personales.
+
 Formato del CSV (separador `,` o `;`, UTF-8; descarga la plantilla desde el panel). Precios en **soles**.
 
 | Obligatorias | Opcionales (valor por defecto) |
@@ -130,7 +132,7 @@ python -m pytest -q                                                    # SQLite 
 TEST_DATABASE_URL=postgresql://u:p@localhost:5432/prueba python -m pytest -q   # PostgreSQL
 ```
 
-52 pruebas cubren el pipeline de ML, validación, autenticación y roles, bloqueo por intentos, CSRF, XSS, subida de archivos, moderación, mensajes, visitas, importación CSV, reentrenamiento (incluido en segundo plano), parámetros y autoreparación del modelo. El workflow de GitHub Actions las corre con SQLite y PostgreSQL.
+58 pruebas cubren el pipeline de ML, validación, autenticación y roles, bloqueo por intentos, CSRF, XSS, subida de archivos, moderación, mensajes, visitas, importación CSV, reentrenamiento (incluido en segundo plano), parámetros y autoreparación del modelo. El workflow de GitHub Actions las corre con SQLite y PostgreSQL.
 
 El CSS de Tailwind ya está compilado en `app/static/css/tailwind.css`. Solo si cambias clases de las plantillas: `npm install && npm run build:css`.
 

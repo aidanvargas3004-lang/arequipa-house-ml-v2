@@ -11,8 +11,9 @@ from .. import services
 from ..extensions import db
 from ..forms import desde_formulario, desde_propiedad
 from ..ml.constants import (
-    DISTRITO_NOMBRES, FEATURE_COLUMNS, ORIGEN_ETIQUETA, TARGET,
+    BOOLEANAS, DISTRITO_NOMBRES, FEATURE_COLUMNS, ORIGEN_ETIQUETA, TARGET,
 )
+from ..ml.anuncio import TIPO_CAMBIO_REFERENCIAL, analizar_anuncio
 from ..ml.schema import limpiar_vivienda
 from ..models import (
     AjusteDistrito, DatasetRegistro, ModeloML, Mensaje, Propiedad, Tasacion, Usuario, Visita, ROLES, ahora,
@@ -271,6 +272,55 @@ def dataset_form(registro_id=None):
     from ..forms import valores_por_defecto
 
     return render_template("admin/dataset_form.html", v=valores_por_defecto(), precio="", reg=None)
+
+
+@bp.route("/dataset/anuncio", methods=["GET", "POST"])
+@solo_admin
+def dataset_anuncio():
+    """Captura asistida: se pega el texto de un anuncio, el sistema propone los datos y el
+    administrador los revisa y confirma antes de guardarlos (no se visita ninguna web)."""
+    from ..forms import CAMPOS_TEXTO
+
+    accion = request.form.get("accion")
+    contexto = {"texto": request.form.get("texto", ""), "fuente": request.form.get("fuente", "").strip(),
+                "tc": request.form.get("tc", str(TIPO_CAMBIO_REFERENCIAL)), "res": None, "v": None, "precio": ""}
+    if request.method == "POST" and accion == "analizar":
+        texto = contexto["texto"].strip()
+        try:
+            tc = float(contexto["tc"].replace(",", "."))
+            if not 2 <= tc <= 6:
+                raise ValueError
+        except ValueError:
+            flash("El tipo de cambio debe ser un número entre 2 y 6.", "error")
+            return render_template("admin/dataset_anuncio.html", **contexto), 422
+        if len(texto) < 30:
+            flash("Pega el texto completo del anuncio (al menos unas líneas).", "error")
+            return render_template("admin/dataset_anuncio.html", **contexto), 422
+        res = analizar_anuncio(texto[:6000], tc)
+        v = {c: "" for c in CAMPOS_TEXTO} | {"estado_conservacion": "Bueno", "acabados": "Estándar", "cochera": "0",
+                                              "pisos": "1", "tipo": "Casa", "distrito": "Cayma"}
+        v.update(res["valores"])
+        v.update({b: res["valores"].get(b, "") for b in BOOLEANAS})
+        contexto.update(res=res, v=v, precio=res["precio"])
+        return render_template("admin/dataset_anuncio.html", **contexto)
+    if request.method == "POST" and accion == "guardar":
+        valores = desde_formulario(request.form)
+        precio = request.form.get("precio", "").strip()
+        datos, errores = limpiar_vivienda(request.form, exigir_precio=True)
+        if not errores and DatasetRegistro.query.filter_by(
+            tipo=datos["tipo"], distrito=datos["distrito"], area_construida=datos["area_construida"], precio=datos["precio"],
+        ).first():
+            errores = ["Ya existe un registro idéntico (mismo tipo, distrito, área y precio). No se guardó para evitar duplicados."]
+        if errores:
+            for e in errores:
+                flash(e, "error")
+            contexto.update(res={"encontrados": [], "faltan": [], "notas": []}, v=valores, precio=precio)
+            return render_template("admin/dataset_anuncio.html", **contexto), 422
+        services.agregar_registro(datos, "web")
+        db.session.commit()
+        flash("Registro guardado en el histórico (origen: anuncio de portal). Reentrena el modelo para usarlo.", "ok")
+        return redirect(url_for("admin.dataset_anuncio"))
+    return render_template("admin/dataset_anuncio.html", **contexto)
 
 
 @bp.route("/dataset/<int:registro_id>/eliminar", methods=["POST"])

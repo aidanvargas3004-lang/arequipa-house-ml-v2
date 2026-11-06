@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% import '_macros.html' as m with context %}
+{% block title %}Capturar datos desde un anuncio{% endblock %}
+{% block contenido %}
+{% include 'admin/_nav.html' %}
+<div class="mb-4">
+  <h1 class="text-2xl font-bold text-slate-900">Capturar datos desde un anuncio</h1>
+  <p class="text-sm text-slate-500">Pega el texto de un anuncio real. El sistema propone los datos y tú los revisas antes de guardarlos. No se visita ningún sitio web.</p>
+</div>
+
+<form method="post" class="card space-y-4" novalidate>
+  {{ m.csrf() }}
+  <input type="hidden" name="accion" value="analizar">
+  <div>
+    <label class="label" for="texto">Texto del anuncio</label>
+    <textarea id="texto" name="texto" rows="7" class="input" placeholder="Ej.: Casa en Yanahuara, 320 m² construidos, 5 dormitorios, 4 baños, 2 cocheras, S/ 1 050 000…" required>{{ texto }}</textarea>
+  </div>
+  <div class="grid gap-4 sm:grid-cols-2">
+    {{ m.campo('fuente', 'Fuente (portal y enlace, opcional)', fuente, 'text', 'Solo como referencia para tu informe; no se guarda en la base.') }}
+    {{ m.campo('tc', 'Tipo de cambio (S/ por US$)', tc, 'number', 'Se usa solo si el precio está en dólares.', 'min="2" max="6" step="0.01"') }}
+  </div>
+  <p class="text-xs text-slate-500">Respeta los términos de uso del portal de origen. Copia solo datos de la vivienda: <strong>no pegues nombres ni teléfonos</strong>. El precio de un anuncio es de oferta, no de cierre.</p>
+  <button class="btn btn-primary" data-once>Analizar anuncio</button>
+</form>
+
+{% if res %}
+<form method="post" class="card mt-6 space-y-6" novalidate>
+  {{ m.csrf() }}
+  <input type="hidden" name="accion" value="guardar">
+  <input type="hidden" name="texto" value="{{ texto }}"><input type="hidden" name="fuente" value="{{ fuente }}"><input type="hidden" name="tc" value="{{ tc }}">
+  <div>
+    <h2 class="font-semibold text-slate-900">Revisa los datos antes de guardar</h2>
+    {% if res.encontrados %}<p class="mt-1 text-sm text-slate-600">Se detectaron {{ res.encontrados|length }} datos. Corrige lo que sea necesario.</p>{% endif %}
+    {% if res.faltan %}<p class="mt-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">No se encontró en el texto: <strong>{{ res.faltan|join(', ') }}</strong>. Aparecen con un valor provisional: complétalos con el anuncio.</p>{% endif %}
+    {% for n in res.notas %}<p class="mt-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-900">{{ n }}</p>{% endfor %}
+  </div>
+  {% include '_form_vivienda.html' %}
+  <div class="max-w-xs border-t border-slate-100 pt-4">
+    {{ m.campo('precio', 'Precio de venta (S/)', precio, 'number', 'Precio del anuncio convertido a soles.', 'required min="20000" max="20000000" step="500"') }}
+  </div>
+  <div class="flex justify-end gap-3">
+    <a class="btn btn-outline" href="{{ url_for('admin.dataset') }}">Cancelar</a>
+    <button class="btn btn-primary" data-once>Guardar en el histórico</button>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

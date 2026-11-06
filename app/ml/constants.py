@@ -102,10 +102,11 @@ LIMITES = {
     "precio": (20000, 20000000),
 }
 
-ORIGENES = ["sintetico", "csv", "manual", "venta"]
+ORIGENES = ["sintetico", "csv", "manual", "venta", "web"]
 ORIGEN_ETIQUETA = {
     "sintetico": "Sintético (demostración)",
     "csv": "Archivo CSV",
     "manual": "Registro manual",
     "venta": "Venta cerrada en la plataforma",
+    "web": "Anuncio de portal (captura asistida)",
 }
