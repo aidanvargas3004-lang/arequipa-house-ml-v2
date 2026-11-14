@@ -1,0 +1,17 @@
+{# Ambos detalles comparten tarjetas y explicaciones de la misma búsqueda. #}
+<section class="mt-6 space-y-4">
+  <h2 class="font-semibold text-slate-900">Viviendas similares publicadas</h2>
+  <p class="text-sm text-slate-600">Alternativas según ubicación y características de la vivienda. El precio puede variar.</p>
+  {% if similares %}
+    <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+      {% for recomendacion in similares %}
+        <div class="space-y-2">
+          {{ m.tarjeta(recomendacion.propiedad) }}
+          <p class="text-sm text-slate-600">{{ recomendacion.motivos|join(' · ') }}</p>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-sm text-slate-500">Aún no hay otras viviendas publicadas para recomendar.</p>
+  {% endif %}
+</section>

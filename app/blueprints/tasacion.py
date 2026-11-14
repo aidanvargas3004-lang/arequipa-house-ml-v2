@@ -6,7 +6,7 @@ from .. import services
 from ..extensions import db
 from ..forms import desde_formulario, precargado
 from ..ml.schema import limpiar_vivienda
-from ..models import Propiedad, Tasacion
+from ..models import Tasacion
 
 bp = Blueprint("tasacion", __name__)
 
@@ -33,13 +33,7 @@ def detalle(tasacion_id):
     t = db.get_or_404(Tasacion, tasacion_id)
     if t.usuario_id != current_user.id and not current_user.es_admin:
         abort(403)
-    d = t.datos
-    similares = (
-        Propiedad.query.filter_by(estado="aprobada", distrito=d.get("distrito"), tipo=d.get("tipo"))
-        .order_by(db.func.abs(Propiedad.area_construida - d.get("area_construida", 0)))
-        .limit(3)
-        .all()
-    )
+    similares = services.recomendar_propiedades(t.datos, excluir_id=t.propiedad_id)
     return render_template("tasacion/resultado.html", t=t, similares=similares)
 
 

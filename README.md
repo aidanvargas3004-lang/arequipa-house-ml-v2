@@ -74,6 +74,34 @@ Las ventas marcadas como «vendida» por un vendedor (con su consentimiento) se 
 
 ## Base de datos
 
+### Recomendaciones de viviendas por vecinos cercanos (KNN)
+
+Al consultar una tasación o abrir el detalle de una propiedad, se muestran hasta
+tres publicaciones aprobadas, ordenadas por similitud. Se excluye la propia
+publicación y nunca se recomiendan viviendas pendientes, rechazadas o vendidas.
+Si no hay candidatos se muestra un mensaje sin recomendaciones.
+
+Ambos flujos usan `services.recomendar_propiedades`, que consulta el catálogo
+actual y delega la búsqueda a `app/ml/recomendaciones.py`. Este módulo utiliza
+`NearestNeighbors` de scikit-learn con distancia euclídea: convierte tipo y
+distrito a one-hot, escala cantidades y codifica conservación, acabados y extras.
+Las escalas fijas y pesos iniciales están comentados en el código; evitan que
+metros cuadrados dominen sobre habitaciones o equipamiento. En departamentos
+no se comparan terreno ni pisos. Los empates se resuelven por ID de publicación.
+
+Las tarjetas explican coincidencias verificables, como mismo distrito o área
+construida dentro de ±15 %. Son las alternativas más cercanas disponibles,
+incluso si el catálogo es pequeño; no existe un umbral mínimo de similitud.
+El precio no participa en la distancia y no se aplica un filtro de presupuesto.
+
+Este algoritmo recomienda inmuebles; Random Forest y Gradient Boosting siguen
+estimando el precio. No requiere reentrenamiento, migraciones ni dependencias
+adicionales. El índice se reconstruye por consulta para reflejar cambios del
+catálogo; para catálogos grandes convendrá medir latencia y añadir un índice
+reutilizable con invalidación al publicar, editar, moderar o vender.
+
+Referencia: [NearestNeighbors en scikit-learn](https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.NearestNeighbors.html).
+
 * **Desarrollo:** SQLite (`instance/arequipa_house.db`), sin configuración.
 * **Producción / PostgreSQL:** define `DATABASE_URL` (acepta `postgres://` y `postgresql://`; se usa el driver `psycopg2`).
 

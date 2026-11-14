@@ -15,7 +15,28 @@ from .ml import pipeline
 from .ml.constants import FEATURE_COLUMNS, TARGET, DISTRITO_NOMBRES
 from .ml.datagen import generar_dataset
 from .ml.schema import limpiar_vivienda, norm
-from .models import AjusteDistrito, DatasetRegistro, ModeloML, Parametro, Tasacion, ahora
+from .models import AjusteDistrito, DatasetRegistro, ModeloML, Parametro, Propiedad, Tasacion, ahora
+from .ml.recomendaciones import motivos_similitud, vecinos_cercanos
+
+
+def recomendar_propiedades(datos: dict, *, excluir_id: int | None = None, limite: int = 3) -> list[dict]:
+    """Única entrada de recomendaciones para ambos flujos de la aplicación.
+
+    Solo las publicaciones aprobadas pueden aparecer, incluso si quien consulta
+    es administrador. Se consulta de nuevo para reflejar ventas y moderaciones
+    sin mantener un índice persistente que pueda quedar desactualizado.
+    """
+    if limite <= 0:
+        return []
+    q = Propiedad.query.filter_by(estado="aprobada")
+    if excluir_id is not None:
+        q = q.filter(Propiedad.id != excluir_id)
+    propiedades = q.order_by(Propiedad.id).all()
+    candidatos = [p.datos_modelo() for p in propiedades]
+    return [
+        {"propiedad": propiedades[i], "motivos": motivos_similitud(datos, candidatos[i])}
+        for i in vecinos_cercanos(datos, candidatos, limite=limite)
+    ]
 
 COLUMNAS_DATASET = FEATURE_COLUMNS + [TARGET]
 

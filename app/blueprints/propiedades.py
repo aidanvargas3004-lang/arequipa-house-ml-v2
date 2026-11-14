@@ -114,6 +114,7 @@ def detalle(propiedad_id):
         "propiedades/detalle.html", p=p, est=est, veredicto=veredicto, es_favorito=es_favorito,
         es_dueno=es_dueno, en_comparador=en_comparador, hay_conversacion=hay_conversacion,
         minimo_visita=minimo_visita,
+        similares=services.recomendar_propiedades(p.datos_modelo(), excluir_id=p.id),
     )
 
 

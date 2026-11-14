@@ -45,12 +45,7 @@
       {% endfor %}
     </div>
 
-    {% if similares %}
-    <div>
-      <h2 class="mb-3 font-semibold text-slate-900">Viviendas similares publicadas</h2>
-      <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{% for p in similares %}{{ m.tarjeta(p) }}{% endfor %}</div>
-    </div>
-    {% endif %}
+    {% include 'propiedades/_recomendaciones.html' %}
   </section>
 
   <aside class="space-y-4">
