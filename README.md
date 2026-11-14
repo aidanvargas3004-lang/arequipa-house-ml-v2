@@ -74,6 +74,47 @@ Las ventas marcadas como «vendida» por un vendedor (con su consentimiento) se 
 
 ## Base de datos
 
+### Segmentación K-Means (administrador)
+
+En **Administración → Segmentos**, pulsa **Calcular / actualizar segmentos**.
+También hay un acceso desde Dataset. El análisis utiliza exclusivamente los
+registros con origen `sintetico` existentes en la base; no genera datos nuevos ni
+mezcla registros reales. Requiere al menos 30 filas y diversidad de perfiles.
+Si eliminaste los sintéticos al importar un CSV, no podrá calcularse con esa base.
+
+`app/ml/segmentacion.py` implementa un aprendizaje no supervisado independiente:
+
+1. Convierte conservación y acabados a niveles ordinales y estandariza las
+   cantidades mediante `StandardScaler`. En departamentos anula terreno y pisos.
+2. Codifica tipo y distrito con one-hot (peso 0.7); los extras booleanos tienen
+   peso 0.35 para que su cantidad no domine. Son decisiones iniciales ajustables.
+3. Prueba K-Means de 2 a 6 grupos, limitado por el tamaño y diversidad del dataset
+   (como máximo un grupo por cada 10 filas, sin garantizar ese tamaño por grupo).
+   Usa `init="k-means++"`, `n_init=10` y semilla 42.
+4. Selecciona la mayor silueta, evaluada sobre una muestra reproducible de hasta
+   1000 filas. La silueta mide separación de grupos entre −1 y 1, no precisión de
+   precios ni validez sobre el mercado real. Puede ser baja aunque sea la mejor
+   de las opciones probadas.
+5. Resume cada grupo mediante medianas de área, habitaciones, baños, antigüedad,
+   precio y precio por m², además del tipo y distrito más frecuentes. El precio
+   no interviene en la formación de grupos. Los segmentos se numeran por área
+   mediana y sus números pueden cambiar al recalcular.
+
+El resultado se guarda aparte en `MODELS_FOLDER/segmentacion_sintetica.joblib`.
+Una huella de los valores sintéticos detecta cambios y muestra un aviso para
+recalcular; abrir el panel no vuelve a entrenar K-Means. Las publicaciones
+aprobadas actuales se asignan al centro más cercano y se listan por segmento,
+sin incorporarlas al entrenamiento. Una asignación no garantiza que una
+publicación sea cercana al perfil: siempre se elige el centro disponible más
+próximo. No se cambian versiones, métricas ni archivos del modelo de tasación.
+
+Los resultados describen **perfiles simulados**, no demanda ni segmentos reales
+del mercado. Si se pierde el archivo del análisis, vuelve a calcularlo desde el
+panel. No requiere nuevas dependencias ni cambios al esquema de la base.
+
+Referencias: [KMeans](https://scikit-learn.org/stable/modules/generated/sklearn.cluster.KMeans.html)
+y [silueta](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.silhouette_score.html).
+
 ### Recomendaciones de viviendas por vecinos cercanos (KNN)
 
 Al consultar una tasación o abrir el detalle de una propiedad, se muestran hasta

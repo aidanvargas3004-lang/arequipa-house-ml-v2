@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import io
+import hashlib
 import threading
 from datetime import timedelta
 from pathlib import Path
+from uuid import uuid4
 
 import pandas as pd
 from flask import current_app
@@ -39,6 +41,48 @@ def recomendar_propiedades(datos: dict, *, excluir_id: int | None = None, limite
     ]
 
 COLUMNAS_DATASET = FEATURE_COLUMNS + [TARGET]
+
+
+def segmentos_catalogo(*, actualizar: bool = False) -> dict:
+    """Guarda un análisis separado; jamás activa o reentrena la tasación.
+
+    La huella incluye los valores, no solo el número de filas: también detecta
+    ediciones del dataset. Las publicaciones se asignan al abrir el panel para
+    reflejar de inmediato las ventas o nuevas aprobaciones.
+    """
+    from .ml.segmentacion import ajustar_segmentos, asignar_segmentos
+
+    registros = DatasetRegistro.query.filter_by(origen="sintetico").order_by(DatasetRegistro.id).all()
+    df = pd.DataFrame([{c: getattr(r, c) for c in COLUMNAS_DATASET} for r in registros], columns=COLUMNAS_DATASET)
+    huella = hashlib.sha256(pd.util.hash_pandas_object(df, index=True).values.tobytes()).hexdigest()
+    ruta = Path(current_app.config["MODELS_FOLDER"]) / "segmentacion_sintetica.joblib"
+    bundle = None
+    if actualizar:
+        bundle = ajustar_segmentos(df)
+        bundle["huella"] = huella
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        # Reemplazo atómico: el lector no ve un archivo a medio escribir.
+        temporal = ruta.with_name(f"segmentacion_{uuid4().hex}.tmp")
+        try:
+            pipeline.guardar(bundle, temporal)
+            temporal.replace(ruta)
+        finally:
+            temporal.unlink(missing_ok=True)
+    elif ruta.is_file():
+        try:
+            bundle = pipeline.cargar(ruta)
+        except Exception:
+            current_app.logger.exception("No se pudo cargar la segmentación guardada")
+    if bundle is None:
+        return {"resultado": None, "n_sinteticos": len(df), "desactualizado": False}
+    propiedades = Propiedad.query.filter_by(estado="aprobada").order_by(Propiedad.id).all()
+    etiquetas = asignar_segmentos(bundle, pd.DataFrame([p.datos_modelo() for p in propiedades]))
+    grupos = [dict(g, publicaciones=[]) for g in bundle["grupos"]]
+    por_id = {g["id"]: g for g in grupos}
+    for propiedad, etiqueta in zip(propiedades, etiquetas):
+        por_id[int(etiqueta)]["publicaciones"].append(propiedad)
+    return {"resultado": dict(bundle, grupos=grupos), "n_sinteticos": len(df),
+            "desactualizado": bundle["huella"] != huella}
 
 # ------------------------------------------------------------------ parámetros
 PARAMETROS_BASE = {

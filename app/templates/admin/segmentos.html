@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% import '_macros.html' as m with context %}
+{% block title %}Segmentos de viviendas{% endblock %}
+{% block contenido %}
+{% include 'admin/_nav.html' %}
+<div class="card space-y-4">
+  <h1 class="text-2xl font-bold text-slate-900">Segmentos de viviendas</h1>
+  <p class="text-sm text-amber-900">Segmentación basada exclusivamente en datos sintéticos de demostración. Describe perfiles simulados; no representa la demanda ni el mercado real de Arequipa.</p>
+  <p class="text-sm text-slate-600">Hay {{ n_sinteticos }} registros sintéticos disponibles. Los datos reales quedan fuera del análisis. El modelo activo de tasación se mantiene independiente.</p>
+  <form method="post">
+    {{ m.csrf() }}
+    <button class="btn btn-primary" data-once>Calcular / actualizar segmentos</button>
+  </form>
+</div>
+{% if resultado %}
+  {% if desactualizado %}<p class="card mt-6 text-amber-900">El dataset sintético cambió desde este análisis. Actualiza los segmentos para reflejarlo.</p>{% endif %}
+  <div class="card mt-6 space-y-2">
+    <h2 class="font-semibold">Método y calidad de agrupación</h2>
+    <p class="text-sm text-slate-600">K-Means con inicialización k-means++, 10 intentos y semilla 42. Cantidades estandarizadas, categorías one-hot y extras con menor peso. El precio se resume después, sin intervenir en la agrupación.</p>
+    <p>{{ resultado.n }} registros analizados · {{ resultado.k }} grupos · Silueta {{ '%.3f'|format(resultado.silueta) }}</p>
+    <p class="text-sm text-slate-600">La silueta va de −1 a 1; valores mayores indican grupos mejor separados. No es un porcentaje de precisión. Se elige el mejor valor entre las opciones evaluadas.</p>
+    <p class="text-sm text-slate-600">Fecha del análisis (UTC): {{ resultado.fecha }}</p>
+    <table class="min-w-full text-sm">
+      <thead><tr><th class="th">Grupos probados</th><th class="th">Silueta</th></tr></thead>
+      <tbody>{% for e in resultado.evaluaciones %}<tr><td class="td">{{ e.k }}</td><td class="td">{{ '%.3f'|format(e.silueta) }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+  <div class="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+    {% for g in resultado.grupos %}
+      <section class="card space-y-3">
+        <h2 class="font-semibold text-slate-900">Segmento {{ loop.index }} · {{ g.tipo }} predominante</h2>
+        <p>{{ g.n }} registros sintéticos ({{ '%.1f'|format(g.porcentaje) }} %)</p>
+        <dl class="text-sm space-y-2">
+          <div>Área mediana: <strong>{{ g.area|m2 }}</strong></div>
+          <div>Habitaciones / baños (mediana): {{ g.habitaciones }} / {{ g.banos }}</div>
+          <div>Antigüedad mediana: {{ g.antiguedad }} años</div>
+          <div>Distrito más frecuente: {{ g.distrito }}</div>
+          <div>Precio mediano simulado: {{ g.precio|soles }}</div>
+          <div>Mediana del precio por m²: {{ g.precio_m2|soles }}</div>
+        </dl>
+        <details>
+          <summary class="text-sm font-semibold">{{ g.publicaciones|length }} publicaciones disponibles asociadas</summary>
+          <p class="text-xs text-slate-500">Asignadas al centro más cercano por características. No se usan para entrenar estos grupos.</p>
+          <ul class="space-y-2 text-sm">
+            {% for p in g.publicaciones %}<li><a class="text-blue-800 underline" href="{{ url_for('propiedades.detalle', propiedad_id=p.id) }}">{{ p.titulo }}</a> · {{ p.precio|soles }}</li>
+            {% else %}<li>No hay publicaciones aprobadas en este segmento.</li>{% endfor %}
+          </ul>
+        </details>
+      </section>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="card mt-6">Todavía no hay un análisis guardado. Se requieren al menos 30 registros sintéticos y suficiente diversidad de características. Pulsa el botón para calcularlo.</p>
+{% endif %}
+{% endblock %}

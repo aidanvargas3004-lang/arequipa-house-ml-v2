@@ -76,6 +76,21 @@ def panel():
 
 
 # ---------------------------------------------------------------- usuarios
+@bp.route("/segmentos", methods=["GET", "POST"])
+@solo_admin
+def segmentos():
+    """Análisis exploratorio solicitado explícitamente por el administrador."""
+    if request.method == "POST":
+        try:
+            services.segmentos_catalogo(actualizar=True)
+        except ValueError as e:
+            flash(str(e), "error")
+        else:
+            flash("Segmentos sintéticos actualizados. El modelo de tasación no cambió.", "ok")
+        return redirect(url_for("admin.segmentos"))
+    return render_template("admin/segmentos.html", **services.segmentos_catalogo())
+
+
 @bp.route("/usuarios")
 @solo_admin
 def usuarios():
