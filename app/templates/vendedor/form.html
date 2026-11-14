@@ -3,9 +3,10 @@
 {% set es_admin = admin is defined and admin %}
 {% block title %}{{ 'Editar publicación' if p else 'Publicar vivienda' }}{% endblock %}
 {% block contenido %}
-{% set accion = url_for('admin.publicacion_editar', propiedad_id=p.id) if es_admin else (url_for('vendedor.editar', propiedad_id=p.id) if p else url_for('vendedor.publicar')) %}
+{% if es_admin %}{% include 'admin/_nav.html' %}{% endif %}
+{% set accion = (url_for('admin.publicacion_editar', propiedad_id=p.id) if p else url_for('admin.publicacion_nueva')) if es_admin else (url_for('vendedor.editar', propiedad_id=p.id) if p else url_for('vendedor.publicar')) %}
 <h1 class="mb-1 text-2xl font-bold text-slate-900">{{ 'Editar publicación' if p else 'Publicar vivienda' }}</h1>
-<p class="mb-5 text-sm text-slate-500">{% if es_admin %}Edición como administrador: no cambia el estado de la publicación.{% else %}Tu publicación será revisada por un administrador antes de ser visible.{% endif %}</p>
+<p class="mb-5 text-sm text-slate-500">{% if es_admin and p %}Edición como administrador: no cambia el estado de la publicación.{% elif es_admin %}La vivienda se publicará directamente en el catálogo y quedará asociada a tu cuenta como responsable.{% else %}Tu publicación será revisada por un administrador antes de ser visible.{% endif %}</p>
 
 {% if p and not es_admin and p.fotos %}
 <div class="card mb-5">
@@ -59,7 +60,7 @@
 
   <div class="flex justify-end gap-3">
     <a class="btn btn-outline" href="{{ url_for('admin.publicaciones', estado='todas') if es_admin else url_for('vendedor.mis_publicaciones') }}">Cancelar</a>
-    <button class="btn btn-primary" data-once>{{ 'Guardar cambios' if p else 'Enviar a revisión' }}</button>
+    <button class="btn btn-primary" data-once>{{ 'Guardar cambios' if p else ('Publicar en el catálogo' if es_admin else 'Enviar a revisión') }}</button>
   </div>
 </form>
 {% endblock %}

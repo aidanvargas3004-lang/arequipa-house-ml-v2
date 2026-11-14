@@ -75,6 +75,15 @@ def mis_publicaciones():
 @bp.route("/publicar", methods=["GET", "POST"])
 @roles_required("vendedor")
 def publicar():
+    return _crear_publicacion()
+
+
+def _crear_publicacion(*, admin: bool = False):
+    """Comparte validación y fotos sin ampliar los permisos del vendedor.
+
+    Solo la ruta administrativa protegida activa la publicación directa. El
+    estado y el propietario se fijan en el servidor, nunca desde el formulario.
+    """
     extra = {"titulo": "", "descripcion": "", "direccion": "", "precio": ""}
     if request.method == "POST":
         valores = desde_formulario(request.form)
@@ -88,22 +97,25 @@ def publicar():
         if errores:
             for e in errores:
                 flash(e, "error")
-            return render_template("vendedor/form.html", v=valores, x=extra, p=None), 422
-        p = Propiedad(vendedor_id=current_user.id, precio=datos["precio"], estado="pendiente", **textos,
+            return render_template("vendedor/form.html", v=valores, x=extra, p=None, admin=admin), 422
+        p = Propiedad(vendedor_id=current_user.id, precio=datos["precio"], estado="aprobada" if admin else "pendiente", **textos,
                       **{c: datos[c] if c not in BOOLEANAS else bool(datos[c]) for c in Propiedad.CAMPOS_MODELO})
         errores_fotos = _guardar_fotos(p, fotos)
         if not p.fotos:
             for e in errores_fotos:
                 flash(e, "error")
-            return render_template("vendedor/form.html", v=valores, x=extra, p=None), 422
+            return render_template("vendedor/form.html", v=valores, x=extra, p=None, admin=admin), 422
         db.session.add(p)
         db.session.commit()
         for e in errores_fotos:
             flash(e, "warning")
+        if admin:
+            flash("Propiedad publicada y visible en el catálogo.", "ok")
+            return redirect(url_for("propiedades.detalle", propiedad_id=p.id))
         flash("Publicación enviada. Será visible cuando el administrador la apruebe.", "ok")
         return redirect(url_for("vendedor.mis_publicaciones"))
     extra["precio"] = request.args.get("precio", "")
-    return render_template("vendedor/form.html", v=precargado(request.args), x=extra, p=None)
+    return render_template("vendedor/form.html", v=precargado(request.args), x=extra, p=None, admin=admin)
 
 
 @bp.route("/publicaciones/<int:propiedad_id>/editar", methods=["GET", "POST"])

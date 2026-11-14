@@ -79,7 +79,7 @@
         {% endif %}
       </div>
       {% if es_dueno %}
-        <a class="btn btn-primary w-full" href="{{ url_for('vendedor.editar', propiedad_id=p.id) }}">Editar mi publicación</a>
+        <a class="btn btn-primary w-full" href="{{ (url_for('admin.publicacion_editar', propiedad_id=p.id) if current_user.es_admin else url_for('vendedor.editar', propiedad_id=p.id)) }}">Editar mi publicación</a>
       {% endif %}
       {% if current_user.is_authenticated and current_user.es_admin %}
         <a class="btn btn-outline w-full" href="{{ url_for('admin.publicacion_editar', propiedad_id=p.id) }}">Editar (administrador)</a>

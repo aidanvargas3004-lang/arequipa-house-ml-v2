@@ -40,6 +40,22 @@ Copia `.env.example` a `.env` para ajustar variables (`SECRET_KEY`, `DATABASE_UR
 
 ## Datos y Machine Learning
 
+### Publicar viviendas como administrador
+
+En **Administración → Moderación → + Publicar vivienda**, el administrador puede
+crear un anuncio con características, precio y al menos una foto válida. Se
+publica directamente como aprobado y queda asociado a la cuenta administrativa
+que lo creó. Se reutilizan las validaciones, el procesamiento seguro de fotos y
+el cálculo de precio sugerido del formulario del vendedor. El estado y el
+responsable se determinan en el servidor.
+
+La publicación se administra desde Moderación y el administrador puede atender
+sus conversaciones y solicitudes desde Mensajes y Visitas. Esos accesos siguen
+limitados a las conversaciones y viviendas donde participa su cuenta; no dan
+acceso a conversaciones ajenas. Crear una publicación no agrega automáticamente
+un registro al dataset histórico. Los vendedores siguen enviando sus anuncios
+a revisión como antes.
+
 **Variables del modelo (19):** tipo, distrito, área construida, área del terreno, pisos, habitaciones, baños, cocheras, antigüedad, estado de conservación, calidad de acabados, jardín, piscina, ascensor, seguridad, cercanía a colegios / hospitales / centros comerciales y acceso a transporte público.
 
 **Entrenamiento (`app/ml/pipeline.py`):**

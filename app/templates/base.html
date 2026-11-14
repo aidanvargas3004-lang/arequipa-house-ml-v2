@@ -34,6 +34,8 @@
           <a class="navlink" href="{{ url_for('vendedor.mis_publicaciones') }}">Mis publicaciones</a>
         {% endif %}
         {% if current_user.es_admin %}
+          <a class="navlink" href="{{ url_for('interaccion.mensajes') }}">Mensajes{% if avisos.mensajes %} <span class="badge bg-red-500 text-white">{{ avisos.mensajes }}</span>{% endif %}</a>
+          <a class="navlink" href="{{ url_for('interaccion.visitas') }}">Visitas{% if avisos.visitas %} <span class="badge bg-red-500 text-white">{{ avisos.visitas }}</span>{% endif %}</a>
           <a class="navlink" href="{{ url_for('admin.panel') }}">Administración{% if avisos.moderacion %} <span class="badge bg-red-500 text-white">{{ avisos.moderacion }}</span>{% endif %}</a>
         {% endif %}
         <details class="relative md:ml-2">

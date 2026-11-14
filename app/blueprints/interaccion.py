@@ -35,7 +35,7 @@ def contactar(propiedad_id):
 
 
 @bp.route("/mensajes")
-@roles_required("comprador", "vendedor")
+@roles_required("comprador", "vendedor", "administrador")
 def mensajes():
     uid = current_user.id
     msgs = (
@@ -56,7 +56,7 @@ def mensajes():
 
 
 @bp.route("/mensajes/<int:propiedad_id>/<int:comprador_id>", methods=["GET", "POST"])
-@roles_required("comprador", "vendedor")
+@roles_required("comprador", "vendedor", "administrador")
 def conversacion(propiedad_id, comprador_id):
     p = db.get_or_404(Propiedad, propiedad_id)
     if current_user.id not in (comprador_id, p.vendedor_id):
@@ -127,7 +127,7 @@ def solicitar_visita(propiedad_id):
 
 
 @bp.route("/visitas")
-@roles_required("comprador", "vendedor")
+@roles_required("comprador", "vendedor", "administrador")
 def visitas():
     uid = current_user.id
     mias = Visita.query.filter_by(comprador_id=uid).order_by(Visita.fecha_hora.desc()).all()
@@ -141,7 +141,7 @@ def visitas():
 
 
 @bp.route("/visitas/<int:visita_id>/responder", methods=["POST"])
-@roles_required("vendedor")
+@roles_required("vendedor", "administrador")
 def responder_visita(visita_id):
     v = db.get_or_404(Visita, visita_id)
     if v.propiedad.vendedor_id != current_user.id:

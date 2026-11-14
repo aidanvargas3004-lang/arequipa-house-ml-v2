@@ -4,7 +4,7 @@
 {% block contenido %}
 <h1 class="mb-5 text-2xl font-bold text-slate-900">Visitas</h1>
 
-{% if current_user.rol == 'vendedor' %}
+{% if current_user.rol in ('vendedor', 'administrador') %}
 <section class="mb-8">
   <h2 class="mb-3 font-semibold text-slate-900">Solicitudes recibidas en mis viviendas</h2>
   {% if recibidas %}

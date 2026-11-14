@@ -112,13 +112,13 @@ def _registrar_contexto(app: Flask) -> None:
                 )
                 .count()
             )
-            if current_user.rol == "vendedor":
+            if current_user.rol in ("vendedor", "administrador"):
                 avisos["visitas"] = (
                     Visita.query.join(Propiedad, Visita.propiedad_id == Propiedad.id)
                     .filter(Propiedad.vendedor_id == current_user.id, Visita.estado == "pendiente")
                     .count()
                 )
-            elif current_user.rol == "administrador":
+            if current_user.rol == "administrador":
                 avisos["moderacion"] = Propiedad.query.filter_by(estado="pendiente").count()
         datos["avisos"] = avisos
         return datos

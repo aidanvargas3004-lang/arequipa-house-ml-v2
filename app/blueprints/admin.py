@@ -20,7 +20,7 @@ from ..models import (
 )
 from ..utils import roles_required
 from .auth import EMAIL_RE, validar_clave
-from .vendedor import _aplicar, _guardar_fotos, _validar_textos
+from .vendedor import _aplicar, _crear_publicacion, _guardar_fotos, _validar_textos
 
 bp = Blueprint("admin", __name__, url_prefix="/admin")
 solo_admin = roles_required("administrador")
@@ -165,6 +165,13 @@ def usuario_nuevo():
 
 
 # ----------------------------------------------------------- publicaciones
+@bp.route("/publicaciones/nueva", methods=["GET", "POST"])
+@solo_admin
+def publicacion_nueva():
+    """Publicación directa con el administrador autenticado como responsable."""
+    return _crear_publicacion(admin=True)
+
+
 @bp.route("/publicaciones")
 @solo_admin
 def publicaciones():
