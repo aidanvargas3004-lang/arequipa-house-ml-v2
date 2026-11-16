@@ -15,6 +15,15 @@ Plataforma web para **estimar el precio de casas, departamentos y dúplex en Are
 
 Cada tasación muestra: precio estimado, rango probable, precio por m², **factores que subieron o bajaron el precio**, vivienda similares publicadas y la versión del modelo utilizada.
 
+## Obtener el código
+
+```bash
+git clone https://github.com/aidanvargas3004-lang/arequipa-house-ml-v2
+cd arequipa-house-ml-v2
+```
+
+Para colaborar (ramas, commits y Pull Requests), consulta la [guía de contribución](CONTRIBUTING.md).
+
 ## Inicio rápido (desarrollo)
 
 Requisitos: Python 3.11 o superior (desarrollado y probado con 3.13).
@@ -219,7 +228,7 @@ python -m pytest -q                                                    # SQLite 
 TEST_DATABASE_URL=postgresql://u:p@localhost:5432/prueba python -m pytest -q   # PostgreSQL
 ```
 
-59 pruebas cubren el pipeline de ML, validación, autenticación y roles, bloqueo por intentos, CSRF, XSS, subida de archivos, moderación, mensajes, visitas, importación CSV, reentrenamiento (incluido en segundo plano), parámetros y autoreparación del modelo. El workflow de GitHub Actions las corre con SQLite y PostgreSQL.
+66 pruebas cubren el pipeline de ML, validación, autenticación y roles, bloqueo por intentos, CSRF, XSS, subida de archivos, moderación, mensajes, visitas, importación CSV, captura asistida de anuncios, recomendaciones KNN, segmentación K-Means, publicación del administrador, reentrenamiento (incluido en segundo plano), parámetros y autoreparación del modelo. El workflow de GitHub Actions las corre con SQLite y PostgreSQL.
 
 El CSS de Tailwind ya está compilado en `app/static/css/tailwind.css`. Solo si cambias clases de las plantillas: `npm install && npm run build:css`.
 
