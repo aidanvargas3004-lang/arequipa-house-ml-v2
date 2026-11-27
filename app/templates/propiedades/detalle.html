@@ -58,7 +58,7 @@
         <div><p class="text-slate-500">Precio publicado</p><p class="text-xl font-bold">{{ p.precio|soles }}</p></div>
         <div><p class="text-slate-500">Conclusión</p><p class="font-semibold">{{ veredicto.etiqueta }}</p><p class="text-xs text-slate-500">{{ '%+.1f'|format(veredicto.diferencia * 100) }} % frente a la estimación</p></div>
       </div>
-      <p class="mt-3 text-xs text-slate-400">Referencial · modelo v{{ est.modelo.version }} ({{ est.modelo.algoritmo_nombre }}). No reemplaza una tasación oficial.</p>
+      <p class="mt-3 text-xs text-slate-400">Referencial · modelo v{{ est.modelo.version }} ({{ est.modelo.algoritmo_nombre }}).</p>
     </div>
   </section>
 
