@@ -240,7 +240,7 @@ python -m pytest -q                                                    # SQLite 
 TEST_DATABASE_URL=postgresql://u:p@localhost:5432/prueba python -m pytest -q   # PostgreSQL
 ```
 
-76 pruebas cubren el pipeline de ML, validación, autenticación y roles, bloqueo por intentos, CSRF, XSS, subida de archivos, moderación, mensajes, visitas, importación CSV, captura asistida de anuncios, recomendaciones KNN, segmentación K-Means, publicación del administrador, reentrenamiento (incluido en segundo plano), parámetros y autoreparación del modelo, control de calidad de datos, rango probable calibrado y monitoreo contra ventas reales. El workflow de GitHub Actions las corre con SQLite y PostgreSQL.
+77 pruebas cubren el pipeline de ML, validación, autenticación y roles, bloqueo por intentos, CSRF, XSS, subida de archivos, moderación, mensajes, visitas, importación CSV, captura asistida de anuncios, recomendaciones KNN, segmentación K-Means, publicación del administrador, reentrenamiento (incluido en segundo plano), parámetros y autoreparación del modelo, control de calidad de datos, rango probable calibrado y monitoreo contra ventas reales. El workflow de GitHub Actions las corre con SQLite y PostgreSQL.
 
 El CSS de Tailwind ya está compilado en `app/static/css/tailwind.css`. Solo si cambias clases de las plantillas: `npm install && npm run build:css`.
 
