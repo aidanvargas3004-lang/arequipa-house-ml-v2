@@ -190,6 +190,10 @@ def marcar_vendida(propiedad_id):
             flash(e, "error")
         return redirect(url_for("vendedor.mis_publicaciones"))
     p.estado = "vendida"
+    try:  # monitoreo: se compara lo que estima el sistema con el precio real de la venta
+        services.registrar_evaluacion(p.datos_modelo(), datos["precio"], origen="plataforma", propiedad_id=p.id)
+    except Exception:  # noqa: BLE001 - el monitoreo nunca debe impedir registrar la venta
+        current_app.logger.exception("No se pudo registrar la evaluación de la venta")
     if request.form.get("aportar_dataset"):
         services.agregar_registro(datos, "venta")
         flash("¡Felicitaciones por la venta! Los datos se sumaron al histórico para mejorar el modelo.", "ok")

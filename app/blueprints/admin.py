@@ -16,7 +16,7 @@ from ..ml.constants import (
 from ..ml.anuncio import TIPO_CAMBIO_REFERENCIAL, analizar_anuncio
 from ..ml.schema import limpiar_vivienda
 from ..models import (
-    AjusteDistrito, DatasetRegistro, ModeloML, Mensaje, Propiedad, Tasacion, Usuario, Visita, ROLES, ahora,
+    AjusteDistrito, DatasetRegistro, EvaluacionVenta, ModeloML, Mensaje, Propiedad, Tasacion, Usuario, Visita, ROLES, ahora,
 )
 from ..utils import roles_required
 from .auth import EMAIL_RE, validar_clave
@@ -263,8 +263,16 @@ def dataset():
     filtros = {k: v for k, v in request.args.items() if k != "pagina" and v}
     return render_template(
         "admin/dataset.html", pag=pag, filtros=filtros, comp=services.composicion_dataset(),
-        origen_etiqueta=ORIGEN_ETIQUETA,
+        origen_etiqueta=ORIGEN_ETIQUETA, calidad=services.calidad_dataset(),
     )
+
+
+@bp.route("/dataset/atipicos/eliminar", methods=["POST"])
+@solo_admin
+def dataset_eliminar_atipicos():
+    n = services.eliminar_atipicos()
+    flash(f"Se eliminaron {n:,} registros atípicos del dataset." if n else "No hay registros atípicos que eliminar.", "ok")
+    return redirect(url_for("admin.dataset"))
 
 
 @bp.route("/dataset/nuevo", methods=["GET", "POST"])
@@ -441,7 +449,10 @@ def modelos_estado():
 @solo_admin
 def modelo_entrenar():
     try:
-        services.lanzar_entrenamiento(current_user.id, activar=bool(request.form.get("activar")))
+        services.lanzar_entrenamiento(
+            current_user.id, activar=bool(request.form.get("activar")),
+            excluir_atipicos=bool(request.form.get("excluir_atipicos")),
+        )
         flash("Entrenamiento iniciado en segundo plano. El modelo actual sigue atendiendo estimaciones.", "ok")
     except services.EntrenamientoEnCurso as e:
         flash(str(e), "warning")
@@ -489,6 +500,80 @@ def modelo_eliminar(modelo_id):
         db.session.commit()
         flash("Versión eliminada.", "ok")
     return redirect(url_for("admin.modelos"))
+
+
+# --------------------------------------------------------------- monitoreo
+@bp.route("/monitoreo")
+@solo_admin
+def monitoreo():
+    from ..forms import valores_por_defecto
+
+    filas = EvaluacionVenta.query.order_by(EvaluacionVenta.id.desc()).limit(50).all()
+    return render_template(
+        "admin/monitoreo.html", resumen=services.resumen_monitoreo(), filas=filas,
+        v=valores_por_defecto(), precio="",
+    )
+
+
+@bp.route("/monitoreo/venta", methods=["POST"])
+@solo_admin
+def monitoreo_venta():
+    valores = desde_formulario(request.form)
+    precio = request.form.get("precio", "").strip()
+    datos, errores = limpiar_vivienda(request.form, exigir_precio=True)
+    if errores:
+        for e in errores:
+            flash(e, "error")
+        filas = EvaluacionVenta.query.order_by(EvaluacionVenta.id.desc()).limit(50).all()
+        return render_template(
+            "admin/monitoreo.html", resumen=services.resumen_monitoreo(), filas=filas, v=valores, precio=precio,
+        ), 422
+    ev = services.registrar_evaluacion(datos, datos["precio"], origen="manual")
+    if request.form.get("entrenar"):
+        services.agregar_registro(datos, "venta")
+    db.session.commit()
+    signo = "por encima" if ev.error_relativo > 0 else "por debajo"
+    flash(
+        f"Evaluación registrada: el sistema estimó {ev.precio_estimado:,.0f} y el precio real fue {ev.precio_real:,.0f} "
+        f"({abs(ev.error_relativo) * 100:.1f} % {signo}; {'dentro' if ev.dentro_del_rango else 'fuera'} del rango).", "ok",
+    )
+    return redirect(url_for("admin.monitoreo"))
+
+
+@bp.route("/monitoreo/csv", methods=["POST"])
+@solo_admin
+def monitoreo_csv():
+    archivo = request.files.get("archivo")
+    if not archivo or not archivo.filename:
+        flash("Selecciona un archivo CSV.", "error")
+        return redirect(url_for("admin.monitoreo"))
+    contenido = archivo.read(5 * 1024 * 1024 + 1)
+    if len(contenido) > 5 * 1024 * 1024:
+        flash("El archivo supera los 5 MB.", "error")
+        return redirect(url_for("admin.monitoreo"))
+    try:
+        r = services.evaluar_ventas_csv(contenido)
+    except ValueError as e:
+        flash(str(e), "error")
+        return redirect(url_for("admin.monitoreo"))
+    flash(f"Evaluación completada: {r['evaluados']:,} ventas evaluadas, {r['omitidos']:,} omitidas.", "ok")
+    for e in r["errores"][:8]:
+        flash(e, "warning")
+    return redirect(url_for("admin.monitoreo"))
+
+
+@bp.route("/monitoreo/exportar")
+@solo_admin
+def monitoreo_exportar():
+    filas = EvaluacionVenta.query.order_by(EvaluacionVenta.id).all()
+    return _csv_respuesta(
+        "evaluaciones_ventas.csv",
+        ["id", "fecha_utc", "origen", "modelo", "tipo", "distrito", "area_construida", "precio_estimado", "precio_min",
+         "precio_max", "precio_real", "error_pct", "dentro_del_rango"],
+        ([e.id, e.creado_en.isoformat(timespec="seconds"), e.origen, f"v{e.modelo_version}", e.datos.get("tipo"),
+          e.datos.get("distrito"), e.datos.get("area_construida"), e.precio_estimado, e.precio_min, e.precio_max,
+          e.precio_real, round(e.error_relativo * 100, 2), "sí" if e.dentro_del_rango else "no"] for e in filas),
+    )
 
 
 # --------------------------------------------------------------- parámetros

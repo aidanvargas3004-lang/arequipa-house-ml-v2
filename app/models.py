@@ -217,6 +217,36 @@ class Tasacion(db.Model):
     modelo = db.relationship("ModeloML")
 
 
+class EvaluacionVenta(db.Model):
+    """Compara lo que estimó el sistema con el precio real de una venta cerrada.
+
+    No usa claves foráneas a propósito: debe conservarse aunque se elimine la
+    publicación o la versión del modelo que hizo la estimación.
+    """
+
+    __tablename__ = "evaluaciones_venta"
+
+    id = db.Column(db.Integer, primary_key=True)
+    propiedad_id = db.Column(db.Integer)  # publicación de origen (si la hay)
+    modelo_version = db.Column(db.Integer)  # versión del modelo que estimó
+    origen = db.Column(db.String(12), nullable=False, default="manual")  # plataforma | manual | csv
+    datos = db.Column(db.JSON, nullable=False)
+    precio_estimado = db.Column(db.Float, nullable=False)
+    precio_min = db.Column(db.Float, nullable=False)
+    precio_max = db.Column(db.Float, nullable=False)
+    precio_real = db.Column(db.Float, nullable=False)
+    creado_en = db.Column(db.DateTime, nullable=False, default=ahora, index=True)
+
+    @property
+    def error_relativo(self) -> float:
+        """(estimado − real) / real. Positivo: el sistema sobreestimó."""
+        return (self.precio_estimado - self.precio_real) / self.precio_real
+
+    @property
+    def dentro_del_rango(self) -> bool:
+        return self.precio_min <= self.precio_real <= self.precio_max
+
+
 class ModeloML(db.Model):
     """Versión de modelo entrenado (el archivo vive en MODELS_FOLDER)."""
 

@@ -1,5 +1,5 @@
 -- ============================================================================
--- Arequipa House ML · PASO 2: crear las 11 tablas
+-- Arequipa House ML · PASO 2: crear las 12 tablas
 -- Ejecutar CONECTADO A LA BASE "arequipa_house" (no a "postgres").
 -- En pgAdmin: clic derecho sobre arequipa_house → Query Tool → pegar o abrir
 -- este archivo → ▶ Ejecutar (F5).
@@ -138,6 +138,22 @@ CREATE INDEX ix_propiedades_precio ON propiedades (precio);
 CREATE INDEX ix_propiedades_tipo ON propiedades (tipo);
 CREATE INDEX ix_propiedades_vendedor_id ON propiedades (vendedor_id);
 
+CREATE TABLE evaluaciones_venta (
+	id SERIAL NOT NULL, 
+	propiedad_id INTEGER, 
+	modelo_version INTEGER, 
+	origen VARCHAR(12) NOT NULL, 
+	datos JSON NOT NULL, 
+	precio_estimado FLOAT NOT NULL, 
+	precio_min FLOAT NOT NULL, 
+	precio_max FLOAT NOT NULL, 
+	precio_real FLOAT NOT NULL, 
+	creado_en TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+	PRIMARY KEY (id)
+);
+
+CREATE INDEX ix_evaluaciones_venta_creado_en ON evaluaciones_venta (creado_en);
+
 CREATE TABLE favoritos (
 	id SERIAL NOT NULL, 
 	usuario_id INTEGER NOT NULL, 
@@ -227,6 +243,6 @@ GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO arequipa;
 
 RESET ROLE;
 
--- Verificación: debe listar 11 tablas
+-- Verificación: debe listar 12 tablas
 SELECT table_name FROM information_schema.tables
 WHERE table_schema = 'public' ORDER BY table_name;

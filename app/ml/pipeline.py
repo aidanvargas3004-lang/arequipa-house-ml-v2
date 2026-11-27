@@ -23,6 +23,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
+from .calidad import separar_atipicos
 from .constants import (
     ACABADOS,
     BOOLEANAS,
@@ -33,6 +34,9 @@ from .constants import (
     NUMERICAS,
     TARGET,
 )
+
+NIVEL_INTERVALO = 0.80   # el rango probable debe contener el precio real ~8 de cada 10 veces
+MIN_CALIBRACION_TIPO = 30  # registros de validación mínimos para calibrar el rango de un solo tipo
 
 ALGORITMOS = {
     "random_forest": "Random Forest",
@@ -113,13 +117,55 @@ def _referencia(x_tr: pd.DataFrame, df_tr: pd.DataFrame) -> dict:
     return ref
 
 
-def entrenar(df: pd.DataFrame, *, semilla: int = 42, n_jobs: int = 1, minimo_filas: int = 60) -> dict:
-    """Entrena y compara ambos algoritmos. Devuelve ``{"bundle": …, "metricas": …}``."""
+def _cuantiles_residuo(real, pred, nivel: float) -> list[float]:
+    """Cuantiles inferior y superior del error relativo en escala logarítmica."""
+    r = np.log(np.asarray(real, dtype=float)) - np.log(np.asarray(pred, dtype=float))
+    a = (1 - nivel) / 2
+    bajo = float(np.quantile(r, a, method="lower"))
+    alto = float(np.quantile(r, 1 - a, method="higher"))
+    return [round(min(bajo, -0.01), 5), round(max(alto, 0.01), 5)]
+
+
+def _calibrar_intervalo(tipos_val, real_val, pred_val, nivel: float = NIVEL_INTERVALO) -> dict:
+    """Calibra el rango probable con los errores reales del modelo (conformal dividido).
+
+    Se miden los errores relativos en el conjunto de validación y se toman sus
+    cuantiles. Así el rango es ancho donde el modelo se equivoca más (por tipo
+    de vivienda) y estrecho donde acierta, en lugar de usar un porcentaje fijo.
+    """
+    tipos_val = np.asarray(tipos_val)
+    por_tipo = {}
+    for tipo in sorted(set(tipos_val)):
+        sel = tipos_val == tipo
+        if int(sel.sum()) >= MIN_CALIBRACION_TIPO:
+            por_tipo[str(tipo)] = _cuantiles_residuo(real_val[sel], pred_val[sel], nivel)
+    return {"nivel": nivel, "global": _cuantiles_residuo(real_val, pred_val, nivel), "por_tipo": por_tipo,
+            "n_calibracion": int(len(real_val))}
+
+
+def limites_intervalo(intervalo: dict, tipo: str) -> list[float]:
+    """Cuantiles (log) del rango para un tipo de vivienda."""
+    return intervalo["por_tipo"].get(tipo, intervalo["global"])
+
+
+def entrenar(df: pd.DataFrame, *, semilla: int = 42, n_jobs: int = 1, minimo_filas: int = 60,
+             excluir_atipicos: bool = True) -> dict:
+    """Entrena y compara ambos algoritmos. Devuelve ``{"bundle": …, "metricas": …}``.
+
+    Con ``excluir_atipicos`` se apartan los registros con precio por m² fuera de lo
+    razonable para su zona (ver ``calidad.py``); las métricas se calculan sobre
+    los datos ya depurados.
+    """
     df = df.dropna(subset=FEATURE_COLUMNS + [TARGET]).reset_index(drop=True)
     if len(df) < minimo_filas:
         raise DatosInsuficientes(
             f"Se requieren al menos {minimo_filas} registros válidos para entrenar (hay {len(df)})."
         )
+    if excluir_atipicos:
+        df, calidad = separar_atipicos(df, minimo_filas=minimo_filas)
+        df = df.reset_index(drop=True)
+    else:
+        calidad = {"total_inicial": int(len(df)), "detectados": 0, "excluidos": 0, "umbral": None, "tope_aplicado": False}
     x = preparar(df)
     y = df[TARGET].astype(float).to_numpy()
 
@@ -140,6 +186,17 @@ def entrenar(df: pd.DataFrame, *, semilla: int = 42, n_jobs: int = 1, minimo_fil
 
     ganador = min(resultados, key=lambda a: resultados[a]["validacion"]["rmse"])
     modelo = modelos[ganador]
+
+    # Rango probable calibrado con los errores de validación; se evalúa en prueba
+    pred_val = modelo.predict(x.iloc[i_val])
+    intervalo = _calibrar_intervalo(df["tipo"].to_numpy()[i_val], y[i_val], pred_val)
+    pred_te = modelo.predict(x.iloc[i_te])
+    q = np.array([limites_intervalo(intervalo, t) for t in df["tipo"].to_numpy()[i_te]])
+    bajo, alto = pred_te * np.exp(q[:, 0]), pred_te * np.exp(q[:, 1])
+    cobertura = float(np.mean((y[i_te] >= bajo) & (y[i_te] <= alto)))
+    ancho = float(np.median((alto - bajo) / (2 * pred_te)))
+    intervalo_info = {"nivel": intervalo["nivel"], "cobertura_prueba": round(cobertura * 100, 1),
+                      "ancho_mediano_pct": round(ancho * 100, 1), "n_calibracion": intervalo["n_calibracion"]}
 
     # Importancia global de variables (permutación sobre validación)
     imp = permutation_importance(
@@ -164,6 +221,7 @@ def entrenar(df: pd.DataFrame, *, semilla: int = 42, n_jobs: int = 1, minimo_fil
         "algoritmo": ganador,
         "referencia": referencia,
         "error_relativo": error_rel,
+        "intervalo": intervalo,
         "columnas": FEATURE_COLUMNS,
         "sklearn": sklearn.__version__,
         "entrenado_en": datetime.now(timezone.utc).isoformat(),
@@ -176,6 +234,8 @@ def entrenar(df: pd.DataFrame, *, semilla: int = 42, n_jobs: int = 1, minimo_fil
         "n_entrenamiento": int(len(i_tr)),
         "n_validacion": int(len(i_val)),
         "n_prueba": int(len(i_te)),
+        "calidad": calidad,
+        "intervalo": intervalo_info,
     }
     return {"bundle": bundle, "metricas": metricas}
 
