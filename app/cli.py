@@ -20,6 +20,19 @@ def registrar_comandos(app):
         sembrar_demo()
         click.echo("Datos de demostración creados.")
 
+    @app.cli.command("seed-tasaciones")
+    @click.option("--email", default=None, help="Usuario dueño de las tasaciones (por defecto, el administrador).")
+    def cmd_seed_tasaciones(email):
+        """Crea 10 tasaciones de ejemplo con el modelo activo (se ven en la tabla tasaciones)."""
+        correo = (email or app.config["ADMIN_EMAIL"]).lower()
+        usuario = Usuario.query.filter_by(email=correo).first()
+        if not usuario:
+            raise click.ClickException(f"No existe el usuario {correo}.")
+        services.asegurar_modelo()
+        n = services.cargar_tasaciones_ejemplo(usuario.id)
+        db.session.commit()
+        click.echo(f"{n} tasaciones de ejemplo creadas para {correo}.")
+
     @app.cli.command("train")
     @click.option("--activar/--no-activar", default=True, help="Activar el modelo al terminar.")
     def cmd_train(activar):

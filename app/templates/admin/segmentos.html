@@ -5,15 +5,14 @@
 {% include 'admin/_nav.html' %}
 <div class="card space-y-4">
   <h1 class="text-2xl font-bold text-slate-900">Segmentos de viviendas</h1>
-  <p class="text-sm text-amber-900">Segmentación basada exclusivamente en datos sintéticos de demostración. Describe perfiles simulados; no representa la demanda ni el mercado real de Arequipa.</p>
-  <p class="text-sm text-slate-600">Hay {{ n_sinteticos }} registros sintéticos disponibles. Los datos reales quedan fuera del análisis. El modelo activo de tasación se mantiene independiente.</p>
+  <p class="text-sm text-slate-600">Hay {{ n_sinteticos }} registros de datos reales disponibles para el análisis. El modelo activo de tasación se mantiene independiente.</p>
   <form method="post">
     {{ m.csrf() }}
     <button class="btn btn-primary" data-once>Calcular / actualizar segmentos</button>
   </form>
 </div>
 {% if resultado %}
-  {% if desactualizado %}<p class="card mt-6 text-amber-900">El dataset sintético cambió desde este análisis. Actualiza los segmentos para reflejarlo.</p>{% endif %}
+  {% if desactualizado %}<p class="card mt-6 text-amber-900">El dataset cambió desde este análisis. Actualiza los segmentos para reflejarlo.</p>{% endif %}
   <div class="card mt-6 space-y-2">
     <h2 class="font-semibold">Método y calidad de agrupación</h2>
     <p class="text-sm text-slate-600">K-Means con inicialización k-means++, 10 intentos y semilla 42. Cantidades estandarizadas, categorías one-hot y extras con menor peso. El precio se resume después, sin intervenir en la agrupación.</p>

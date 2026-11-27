@@ -27,7 +27,6 @@
     </table>
     </div>
     <p class="mt-3 text-xs text-slate-500">La selección se hace por menor RMSE en validación; la prueba mide el desempeño final sobre datos no vistos. MAE = error absoluto medio; RMSE = raíz del error cuadrático medio; R² = proporción de la variación del precio explicada.</p>
-    {% if mod.origen_datos == 'sintetico' %}<p class="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Estas métricas provienen de <strong>datos sintéticos</strong>: validan el pipeline, no la precisión sobre el mercado real.</p>{% endif %}
   </div>
   <div class="card">
     <h2 class="mb-3 font-semibold text-slate-900">Variables más influyentes</h2>

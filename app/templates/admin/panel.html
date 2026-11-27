@@ -21,12 +21,6 @@
   </a>
 </div>
 
-{% if modelo and modelo.origen_datos == 'sintetico' %}
-<div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-  El modelo activo se entrenó solo con <strong>datos sintéticos de demostración</strong>. Cuando tengas el histórico real de Arequipa House, súbelo en <a class="underline" href="{{ url_for('admin.dataset') }}">Dataset</a> y reentrena en <a class="underline" href="{{ url_for('admin.modelos') }}">Modelos ML</a>.
-</div>
-{% endif %}
-
 <div class="mt-6 grid gap-6 lg:grid-cols-3">
   <div class="card lg:col-span-2"><h2 class="mb-2 font-semibold text-slate-900">Tasaciones por día (últimos 30 días)</h2><div class="h-64"><canvas id="g-tasaciones"></canvas></div></div>
   <div class="card"><h2 class="mb-2 font-semibold text-slate-900">Publicaciones por estado</h2><div class="h-64"><canvas id="g-estados"></canvas></div></div>

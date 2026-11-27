@@ -217,6 +217,7 @@ También puedes levantar todo con PostgreSQL local: `docker compose up --build` 
 flask --app wsgi bootstrap            # tablas + parámetros + admin + dataset + modelo (idempotente)
 flask --app wsgi train                # entrena y activa una nueva versión (síncrono)
 flask --app wsgi seed-demo            # usuarios y publicaciones de demostración
+flask --app wsgi seed-tasaciones      # 10 tasaciones de ejemplo con el modelo activo (tabla tasaciones)
 flask --app wsgi create-admin correo@dominio.pe
 ```
 

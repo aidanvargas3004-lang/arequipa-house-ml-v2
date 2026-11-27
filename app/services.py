@@ -247,7 +247,7 @@ def importar_csv(contenido: bytes, *, reemplazar_sinteticos: bool = False, max_f
             eliminados = DatasetRegistro.query.filter_by(origen="sintetico").delete()
         else:
             advertencias.append(
-                f"Se conservaron los datos sintéticos: el archivo aporta menos de {minimo} registros válidos."
+                f"Se conservaron los datos actuales: el archivo aporta menos de {minimo} registros válidos."
             )
     db.session.bulk_insert_mappings(DatasetRegistro, validos)
     db.session.commit()
@@ -562,3 +562,36 @@ def resumen_monitoreo() -> dict | None:
     res = indicadores(filas)
     res["por_version"] = {v: indicadores(g) for v, g in sorted(por_version.items())}
     return res
+
+
+# 10 viviendas típicas de Arequipa para probar la tasación con el modelo activo
+TASACIONES_EJEMPLO = [
+    ("Casa", "Yanahuara", 220, 260, 5, 4, 3, 8, "Bueno", "Alta calidad", 2, 1, 0, 0, 1, 1, 1, 1, 1),
+    ("Departamento", "Cayma", 0, 110, 3, 2, 1, 5, "Excelente", "Estándar", 1, 0, 0, 1, 1, 1, 0, 1, 1),
+    ("Casa", "Cerro Colorado", 160, 180, 4, 3, 2, 12, "Regular", "Estándar", 1, 1, 0, 0, 0, 1, 0, 1, 1),
+    ("Departamento", "Arequipa (Cercado)", 0, 85, 2, 1, 1, 20, "Regular", "Básico", 0, 0, 0, 0, 0, 1, 1, 1, 1),
+    ("Dúplex", "José Luis Bustamante y Rivero", 140, 190, 4, 3, 2, 6, "Bueno", "Alta calidad", 2, 0, 0, 0, 1, 1, 1, 1, 1),
+    ("Casa", "Sachaca", 300, 240, 5, 4, 2, 4, "Excelente", "Lujo", 3, 1, 1, 0, 1, 0, 0, 1, 0),
+    ("Departamento", "Miraflores", 0, 95, 3, 2, 1, 15, "Bueno", "Estándar", 1, 0, 0, 1, 0, 1, 1, 1, 1),
+    ("Casa", "Paucarpata", 120, 140, 3, 2, 2, 25, "Regular", "Básico", 0, 0, 0, 0, 0, 1, 0, 1, 1),
+    ("Casa", "Socabaya", 200, 150, 4, 3, 2, 10, "Bueno", "Estándar", 1, 1, 0, 0, 0, 1, 0, 1, 1),
+    ("Departamento", "Alto Selva Alegre", 0, 75, 2, 1, 1, 10, "Bueno", "Básico", 0, 0, 0, 0, 0, 1, 0, 1, 1),
+]
+
+
+def cargar_tasaciones_ejemplo(usuario_id: int) -> int:
+    """Tasa 10 viviendas de ejemplo con el modelo activo y las guarda en el historial.
+
+    Es repetible: no duplica una vivienda que el usuario ya tiene tasada con los mismos datos.
+    """
+    from .ml.constants import FEATURE_COLUMNS
+
+    existentes = [t.datos for t in Tasacion.query.filter_by(usuario_id=usuario_id).all()]
+    creadas = 0
+    for fila in TASACIONES_EJEMPLO:
+        datos = dict(zip(FEATURE_COLUMNS, fila))
+        if any(e == datos for e in existentes):
+            continue
+        registrar_tasacion(usuario_id, datos, estimar(datos))
+        creadas += 1
+    return creadas

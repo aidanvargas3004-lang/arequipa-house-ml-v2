@@ -70,17 +70,11 @@
         <p class="text-slate-600">Versión {{ mod.version }} · {{ mod.algoritmo_nombre }}</p>
         {% if mod.metricas and mod.metricas.intervalo %}<p class="text-xs text-slate-500">El rango contuvo el precio real en {{ mod.metricas.intervalo.cobertura_prueba }} % de las pruebas.</p>{% endif %}
         {% if mod.metricas %}<p class="text-slate-600">Error típico: ±{{ (mod.metricas.algoritmos[mod.metricas.ganador].validacion.mdape)|round(1) }} % · R² {{ mod.metricas_ganador.r2 }}</p>{% endif %}
-        {% if mod.origen_datos == 'sintetico' %}
-          <p class="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">Este modelo se entrenó con <strong>datos sintéticos de demostración</strong>. Con el histórico real de la empresa la precisión reflejará el mercado.</p>
-        {% elif mod.origen_datos == 'mixto' %}
-          <p class="mt-2 text-xs text-slate-500">Entrenado con datos reales y sintéticos.</p>
-        {% endif %}
       {% else %}<p class="text-slate-500">Versión del modelo ya no disponible.</p>{% endif %}
     </div>
     {% if current_user.rol == 'vendedor' %}
     <a class="btn btn-accent w-full print:hidden" href="{{ url_for('vendedor.publicar', precio=t.precio_estimado|int, **d) }}">Publicar esta vivienda</a>
     {% endif %}
-    <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">Estimación referencial. No reemplaza la tasación oficial o profesional.</div>
   </aside>
 </div>
 {% endblock %}

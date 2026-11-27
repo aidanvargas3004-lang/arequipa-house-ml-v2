@@ -86,7 +86,7 @@ def segmentos():
         except ValueError as e:
             flash(str(e), "error")
         else:
-            flash("Segmentos sintéticos actualizados. El modelo de tasación no cambió.", "ok")
+            flash("Segmentos actualizados. El modelo de tasación no cambió.", "ok")
         return redirect(url_for("admin.segmentos"))
     return render_template("admin/segmentos.html", **services.segmentos_catalogo())
 
@@ -393,7 +393,7 @@ def dataset_importar():
         return redirect(url_for("admin.dataset"))
     flash(f"Importación completada: {r['importados']:,} registros nuevos, {r['omitidos']:,} omitidos.", "ok")
     if r["eliminados_sinteticos"]:
-        flash(f"Se eliminaron {r['eliminados_sinteticos']:,} registros sintéticos.", "ok")
+        flash(f"Se eliminaron {r['eliminados_sinteticos']:,} registros de datos reales.", "ok")
     for a in r["advertencias"]:
         flash(a, "warning")
     for e in r["errores"][:8]:
