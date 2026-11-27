@@ -55,7 +55,7 @@ def test_panel_sintetico_persistencia_y_modelo_intacto(app):
         DatasetRegistro.query.filter_by(origen="sintetico").first().habitaciones += 1
         db.session.commit()
         assert services.segmentos_catalogo()["desactualizado"]
-    assert "El dataset sintético cambió" in admin.get("/admin/segmentos").get_data(as_text=True)
+    assert "El dataset cambió" in admin.get("/admin/segmentos").get_data(as_text=True)
 
 
 def test_segmentos_solo_admin(app, client):

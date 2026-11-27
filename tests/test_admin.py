@@ -218,7 +218,7 @@ def test_importar_datos_reales_reemplaza_los_sinteticos(app):
     df = generar_dataset(80, semilla=77)
     csv_real = df.to_csv(index=False)
     html = subir_csv(admin, csv_real, reemplazar=True).get_data(as_text=True)
-    assert "80 registros nuevos" in html and "Se eliminaron 200 registros sintéticos" in html
+    assert "80 registros nuevos" in html and "Se eliminaron 200 registros de datos reales" in html
     with app.app_context():
         assert services.composicion_dataset() == {"csv": 80}
         m = services.lanzar_entrenamiento(None, sincrono=True)

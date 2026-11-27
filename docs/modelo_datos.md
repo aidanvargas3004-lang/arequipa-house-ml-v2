@@ -46,6 +46,18 @@ erDiagram
         VARCHAR origen
         DATETIME creado_en
     }
+    evaluaciones_venta {
+        INTEGER id PK
+        INTEGER propiedad_id
+        INTEGER modelo_version
+        VARCHAR origen
+        JSON datos
+        FLOAT precio_estimado
+        FLOAT precio_min
+        FLOAT precio_max
+        FLOAT precio_real
+        DATETIME creado_en
+    }
     parametros {
         VARCHAR clave PK
         VARCHAR valor
@@ -185,6 +197,16 @@ erDiagram
 | dataset_registros | precio | FLOAT | no |  |
 | dataset_registros | origen | VARCHAR(15) | no |  |
 | dataset_registros | creado_en | DATETIME | no |  |
+| evaluaciones_venta | id | INTEGER | no | PK |
+| evaluaciones_venta | propiedad_id | INTEGER | sí |  |
+| evaluaciones_venta | modelo_version | INTEGER | sí |  |
+| evaluaciones_venta | origen | VARCHAR(12) | no |  |
+| evaluaciones_venta | datos | JSON | no |  |
+| evaluaciones_venta | precio_estimado | FLOAT | no |  |
+| evaluaciones_venta | precio_min | FLOAT | no |  |
+| evaluaciones_venta | precio_max | FLOAT | no |  |
+| evaluaciones_venta | precio_real | FLOAT | no |  |
+| evaluaciones_venta | creado_en | DATETIME | no |  |
 | parametros | clave | VARCHAR(60) | no | PK |
 | parametros | valor | VARCHAR(60) | no |  |
 | parametros | descripcion | VARCHAR(200) | no |  |

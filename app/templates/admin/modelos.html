@@ -14,6 +14,7 @@
   </div>
   <form method="post" action="{{ url_for('admin.modelo_entrenar') }}" class="flex flex-wrap items-center gap-3" data-confirm="¿Entrenar una nueva versión con el dataset actual?">
     {{ m.csrf() }}
+    <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="excluir_atipicos" value="1" checked class="rounded border-slate-300"> Excluir registros atípicos</label>
     <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="activar" value="1" checked class="rounded border-slate-300"> Activar al terminar</label>
     <button class="btn btn-primary" {{ 'disabled' if en_curso }} data-once>{{ 'Entrenando…' if en_curso else 'Entrenar nueva versión' }}</button>
   </form>

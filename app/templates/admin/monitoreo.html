@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% import '_macros.html' as m with context %}
+{% block title %}Monitoreo del modelo{% endblock %}
+{% block contenido %}
+{% include 'admin/_nav.html' %}
+<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <h1 class="text-2xl font-bold text-slate-900">Monitoreo contra ventas reales</h1>
+    <p class="text-sm text-slate-500">Compara lo que estimó el sistema con el precio al que realmente se vendió una vivienda. Es la mejor evidencia de qué tan bien funciona el modelo.</p>
+  </div>
+  {% if filas %}<a class="btn btn-outline btn-sm" href="{{ url_for('admin.monitoreo_exportar') }}">Exportar CSV</a>{% endif %}
+</div>
+
+{% if resumen %}
+<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+  <div class="card"><p class="text-3xl font-extrabold text-blue-900">{{ resumen.n }}</p><p class="text-sm text-slate-500">Ventas evaluadas</p></div>
+  <div class="card"><p class="text-3xl font-extrabold text-blue-900">{{ '%.1f'|format(resumen.mape) }} %</p><p class="text-sm text-slate-500">Error medio (en valor absoluto)</p></div>
+  <div class="card"><p class="text-3xl font-extrabold text-blue-900">{{ '%.1f'|format(resumen.mdape) }} %</p><p class="text-sm text-slate-500">Error mediano: la mitad de las estimaciones se desvía menos que esto</p></div>
+  <div class="card"><p class="text-3xl font-extrabold text-blue-900">{{ '%+.1f'|format(resumen.sesgo) }} %</p><p class="text-sm text-slate-500">Sesgo: {{ 'el sistema tiende a estimar por encima del precio real' if resumen.sesgo > 1 else ('el sistema tiende a estimar por debajo del precio real' if resumen.sesgo < -1 else 'sin sesgo apreciable') }}</p></div>
+  <div class="card"><p class="text-3xl font-extrabold text-blue-900">{{ '%.0f'|format(resumen.dentro) }} %</p><p class="text-sm text-slate-500">Ventas cuyo precio real cayó dentro del rango probable</p></div>
+  <div class="card"><p class="text-3xl font-extrabold text-blue-900">{{ resumen.mae|soles }}</p><p class="text-sm text-slate-500">Error absoluto medio en soles</p></div>
+</div>
+{% if resumen.por_version|length > 1 %}
+<div class="card mt-5 overflow-x-auto !p-0">
+  <table class="min-w-full divide-y divide-slate-200 text-sm">
+    <thead class="bg-slate-50"><tr><th class="th">Versión del modelo</th><th class="th">Ventas</th><th class="th">Error medio</th><th class="th">Error mediano</th><th class="th">Sesgo</th><th class="th">Dentro del rango</th></tr></thead>
+    <tbody class="divide-y divide-slate-100">
+    {% for ver, r in resumen.por_version.items() %}
+      <tr><td class="td font-semibold">v{{ ver }}</td><td class="td">{{ r.n }}</td><td class="td">{{ '%.1f'|format(r.mape) }} %</td><td class="td">{{ '%.1f'|format(r.mdape) }} %</td><td class="td">{{ '%+.1f'|format(r.sesgo) }} %</td><td class="td">{{ '%.0f'|format(r.dentro) }} %</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% else %}
+<div class="card text-sm text-slate-600">Todavía no hay ventas evaluadas. Se agregan solas cuando un vendedor marca una vivienda como vendida, o puedes registrarlas abajo (una por una o con un CSV).</div>
+{% endif %}
+
+<div class="mt-6 grid gap-6 lg:grid-cols-3">
+  <form method="post" action="{{ url_for('admin.monitoreo_csv') }}" enctype="multipart/form-data" class="card space-y-3 lg:col-span-1">
+    {{ m.csrf() }}
+    <h2 class="font-semibold text-slate-900">Evaluar con un CSV de ventas cerradas</h2>
+    <p class="text-xs text-slate-500">Mismo formato que la importación del dataset (columnas obligatorias: <code>tipo, distrito, area_construida, habitaciones, banos, antiguedad, precio</code>), con el precio real de cierre en soles. Estas ventas <strong>no</strong> se agregan al entrenamiento: solo sirven para medir el error del modelo. Máx. 1 000 filas.</p>
+    <input class="input" type="file" name="archivo" accept=".csv,text/csv" required>
+    <button class="btn btn-primary" data-once>Evaluar</button>
+  </form>
+
+  <form method="post" action="{{ url_for('admin.monitoreo_venta') }}" class="card space-y-6 lg:col-span-2" novalidate>
+    {{ m.csrf() }}
+    <h2 class="font-semibold text-slate-900">Registrar una venta cerrada</h2>
+    {% include '_form_vivienda.html' %}
+    <div class="grid gap-4 border-t border-slate-100 pt-4 sm:grid-cols-2">
+      {{ m.campo('precio', 'Precio real de venta (S/)', precio, 'number', 'Precio al que se cerró la venta.', 'required min="20000" max="20000000" step="500"') }}
+      <label class="flex items-start gap-2 self-end text-sm text-slate-600"><input type="checkbox" name="entrenar" value="1" class="mt-0.5 rounded border-slate-300"> También usar esta venta para entrenar el modelo.</label>
+    </div>
+    <div class="flex justify-end"><button class="btn btn-primary" data-once>Registrar y evaluar</button></div>
+  </form>
+</div>
+
+{% if filas %}
+<h2 class="mb-2 mt-6 font-semibold text-slate-900">Últimas evaluaciones</h2>
+<div class="card overflow-x-auto !p-0">
+  <table class="min-w-full divide-y divide-slate-200 text-sm">
+    <thead class="bg-slate-50"><tr><th class="th">Fecha</th><th class="th">Origen</th><th class="th">Vivienda</th><th class="th">Estimado</th><th class="th">Rango</th><th class="th">Real</th><th class="th">Error</th><th class="th">Modelo</th></tr></thead>
+    <tbody class="divide-y divide-slate-100">
+    {% for e in filas %}
+      <tr>
+        <td class="td whitespace-nowrap">{{ e.creado_en|fecha }}</td>
+        <td class="td"><span class="badge bg-slate-100 text-slate-700">{{ e.origen }}</span></td>
+        <td class="td">{{ e.datos.tipo }} · {{ e.datos.distrito }} · {{ e.datos.area_construida|m2 }}</td>
+        <td class="td">{{ e.precio_estimado|soles }}</td>
+        <td class="td whitespace-nowrap text-xs text-slate-500">{{ e.precio_min|soles }} – {{ e.precio_max|soles }}</td>
+        <td class="td font-semibold text-blue-900">{{ e.precio_real|soles }}</td>
+        <td class="td"><span class="badge {{ 'bg-emerald-100 text-emerald-800' if e.dentro_del_rango else 'bg-red-100 text-red-800' }}">{{ '%+.1f'|format(e.error_relativo * 100) }} %</span></td>
+        <td class="td">v{{ e.modelo_version }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

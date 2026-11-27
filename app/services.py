@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import hashlib
+import math
 import threading
 from datetime import timedelta
 from pathlib import Path
@@ -13,11 +14,13 @@ from flask import current_app
 from sqlalchemy import func
 
 from .extensions import db
-from .ml import pipeline
+from .ml import calidad, pipeline
 from .ml.constants import FEATURE_COLUMNS, TARGET, DISTRITO_NOMBRES
 from .ml.datagen import generar_dataset
 from .ml.schema import limpiar_vivienda, norm
-from .models import AjusteDistrito, DatasetRegistro, ModeloML, Parametro, Propiedad, Tasacion, ahora
+from .models import (
+    AjusteDistrito, DatasetRegistro, EvaluacionVenta, ModeloML, Parametro, Propiedad, Tasacion, ahora,
+)
 from .ml.recomendaciones import motivos_similitud, vecinos_cercanos
 
 
@@ -185,8 +188,8 @@ def _normalizar_columna(nombre: str) -> str:
     return _ALIAS_COLUMNAS.get(n, _ALIAS_COLUMNAS.get(str(nombre).strip().lower(), n))
 
 
-def importar_csv(contenido: bytes, *, reemplazar_sinteticos: bool = False, max_filas: int = 20000) -> dict:
-    """Importa registros históricos desde un CSV. Devuelve un resumen del proceso."""
+def _leer_csv(contenido: bytes, max_filas: int) -> pd.DataFrame:
+    """Lee un CSV (UTF-8 o Latin-1, separador coma o punto y coma) y normaliza sus columnas."""
     df = None
     for codificacion in ("utf-8-sig", "latin-1"):
         try:
@@ -201,7 +204,6 @@ def importar_csv(contenido: bytes, *, reemplazar_sinteticos: bool = False, max_f
         raise ValueError("No se pudo leer el archivo o está vacío. Use un CSV con encabezados.")
     if len(df) > max_filas:
         raise ValueError(f"El archivo supera el máximo de {max_filas:,} filas.")
-
     df.columns = [_normalizar_columna(c) for c in df.columns]
     faltan = [c for c in _REQUERIDAS_CSV if c not in df.columns]
     if faltan:
@@ -209,7 +211,11 @@ def importar_csv(contenido: bytes, *, reemplazar_sinteticos: bool = False, max_f
             "Faltan columnas obligatorias: " + ", ".join(faltan)
             + ". Columnas requeridas: " + ", ".join(_REQUERIDAS_CSV) + "."
         )
+    return df
 
+
+def _filas_validas(df: pd.DataFrame) -> tuple[list[dict], list[str]]:
+    """Valida cada fila; devuelve (filas válidas sin duplicados, mensajes de error)."""
     validos, errores, vistos = [], [], set()
     for n_fila, raw in enumerate(df.to_dict("records"), start=2):
         datos, errs = limpiar_vivienda(raw, exigir_precio=True)
@@ -221,7 +227,15 @@ def importar_csv(contenido: bytes, *, reemplazar_sinteticos: bool = False, max_f
             errores.append(f"Fila {n_fila}: registro duplicado dentro del archivo.")
             continue
         vistos.add(clave)
-        validos.append({c: datos[c] for c in COLUMNAS_DATASET} | {"origen": "csv"})
+        validos.append({c: datos[c] for c in COLUMNAS_DATASET})
+    return validos, errores
+
+
+def importar_csv(contenido: bytes, *, reemplazar_sinteticos: bool = False, max_filas: int = 20000) -> dict:
+    """Importa registros históricos desde un CSV. Devuelve un resumen del proceso."""
+    df = _leer_csv(contenido, max_filas)
+    validos, errores = _filas_validas(df)
+    validos = [v | {"origen": "csv"} for v in validos]
 
     if not validos:
         raise ValueError("Ningún registro del archivo es válido. Primer error: " + (errores[0] if errores else "—"))
@@ -233,7 +247,7 @@ def importar_csv(contenido: bytes, *, reemplazar_sinteticos: bool = False, max_f
             eliminados = DatasetRegistro.query.filter_by(origen="sintetico").delete()
         else:
             advertencias.append(
-                f"Se conservaron los datos sintéticos: el archivo aporta menos de {minimo} registros válidos."
+                f"Se conservaron los datos actuales: el archivo aporta menos de {minimo} registros válidos."
             )
     db.session.bulk_insert_mappings(DatasetRegistro, validos)
     db.session.commit()
@@ -244,6 +258,39 @@ def importar_csv(contenido: bytes, *, reemplazar_sinteticos: bool = False, max_f
         "eliminados_sinteticos": eliminados,
         "advertencias": advertencias,
     }
+
+
+# ------------------------------------------------------------ calidad de datos
+def calidad_dataset(*, filas: int = 15) -> dict:
+    """Detecta registros atípicos del dataset y arma el reporte del panel."""
+    registros = DatasetRegistro.query.all()
+    if not registros:
+        return {"total": 0, "detectados": 0, "porcentaje": 0.0, "por_motivo": {}, "filas": [], "ids": []}
+    df = pd.DataFrame([{**{c: getattr(r, c) for c in COLUMNAS_DATASET}, "id": r.id, "origen": r.origen} for r in registros])
+    det = calidad.detectar_atipicos(df)
+    por_motivo = det["motivo"].value_counts().to_dict() if len(det) else {}
+    ejemplos = []
+    for _, fila in det.head(filas).iterrows():
+        r = df.loc[int(fila["indice"])]
+        ejemplos.append({
+            "id": int(r["id"]), "tipo": r["tipo"], "distrito": r["distrito"], "area": float(r["area_construida"]),
+            "precio": float(r["precio"]), "origen": r["origen"], "precio_m2": float(fila["precio_m2"]),
+            "referencia_m2": float(fila["referencia_m2"]), "motivo": fila["motivo"],
+        })
+    return {
+        "total": int(len(df)), "detectados": int(len(det)), "porcentaje": round(len(det) / len(df) * 100, 1),
+        "por_motivo": por_motivo, "filas": ejemplos, "ids": [int(df.loc[int(i), "id"]) for i in det["indice"]],
+    }
+
+
+def eliminar_atipicos() -> int:
+    """Borra del dataset los registros que la detección marca como atípicos."""
+    ids = calidad_dataset()["ids"]
+    if not ids:
+        return 0
+    n = DatasetRegistro.query.filter(DatasetRegistro.id.in_(ids)).delete(synchronize_session=False)
+    db.session.commit()
+    return n
 
 
 # ---------------------------------------------------------------------- modelos
@@ -269,13 +316,16 @@ def _siguiente_version() -> int:
     return (db.session.query(func.max(ModeloML.version)).scalar() or 0) + 1
 
 
-def _entrenar_en_registro(modelo: ModeloML) -> None:
+def _entrenar_en_registro(modelo: ModeloML, excluir_atipicos: bool | None = None) -> None:
     cfg = current_app.config
+    if excluir_atipicos is None:
+        excluir_atipicos = cfg.get("ML_EXCLUIR_ATIPICOS", True)
     resultado = pipeline.entrenar(
         dataset_df(),
         semilla=cfg["ML_RANDOM_STATE"],
         n_jobs=cfg["ML_N_JOBS"],
         minimo_filas=cfg["ML_MIN_ROWS"],
+        excluir_atipicos=excluir_atipicos,
     )
     archivo = f"modelo_v{modelo.version}.joblib"
     pipeline.guardar(resultado["bundle"], carpeta_modelos() / archivo)
@@ -298,10 +348,10 @@ def activar_modelo(modelo: ModeloML) -> None:
         _cache["id"] = None
 
 
-def _ejecutar(modelo_id: int, activar: bool) -> None:
+def _ejecutar(modelo_id: int, activar: bool, excluir_atipicos: bool | None = None) -> None:
     modelo = db.session.get(ModeloML, modelo_id)
     try:
-        _entrenar_en_registro(modelo)
+        _entrenar_en_registro(modelo, excluir_atipicos)
         db.session.commit()
         if activar:
             activar_modelo(modelo)
@@ -314,15 +364,16 @@ def _ejecutar(modelo_id: int, activar: bool) -> None:
         db.session.commit()
 
 
-def _hilo(app, modelo_id: int, activar: bool) -> None:
+def _hilo(app, modelo_id: int, activar: bool, excluir_atipicos: bool | None = None) -> None:
     with app.app_context():
         try:
-            _ejecutar(modelo_id, activar)
+            _ejecutar(modelo_id, activar, excluir_atipicos)
         finally:
             db.session.remove()
 
 
-def lanzar_entrenamiento(usuario_id: int | None, *, activar: bool = True, sincrono: bool = False) -> ModeloML:
+def lanzar_entrenamiento(usuario_id: int | None, *, activar: bool = True, sincrono: bool = False,
+                         excluir_atipicos: bool | None = None) -> ModeloML:
     """Crea una nueva versión y la entrena (en segundo plano salvo ``sincrono``).
 
     El modelo activo sigue atendiendo las estimaciones mientras tanto, por lo
@@ -340,10 +391,10 @@ def lanzar_entrenamiento(usuario_id: int | None, *, activar: bool = True, sincro
     db.session.add(modelo)
     db.session.commit()
     if sincrono:
-        _ejecutar(modelo.id, activar)
+        _ejecutar(modelo.id, activar, excluir_atipicos)
     else:
         app = current_app._get_current_object()
-        threading.Thread(target=_hilo, args=(app, modelo.id, activar), daemon=True).start()
+        threading.Thread(target=_hilo, args=(app, modelo.id, activar, excluir_atipicos), daemon=True).start()
     return modelo
 
 
@@ -389,11 +440,20 @@ def estimar(datos: dict, *, con_factores: bool = True) -> dict:
     crudo = float(pipeline.predecir(bundle, [datos])[0])
     mult = obtener_parametro("factor_mercado") * ajuste_distrito(datos["distrito"])
     precio = crudo * mult
-    margen = max(0.05, bundle["error_relativo"] + obtener_parametro("margen_extra"))
+    extra = obtener_parametro("margen_extra")
+    intervalo = bundle.get("intervalo")
+    if intervalo:  # rango calibrado con los errores reales del modelo (por tipo de vivienda)
+        q_bajo, q_alto = pipeline.limites_intervalo(intervalo, datos["tipo"])
+        p_min = min(precio * math.exp(q_bajo) * (1 - extra), precio * 0.98)
+        p_max = max(precio * math.exp(q_alto) * (1 + extra), precio * 1.02)
+        margen = (p_max - p_min) / (2 * precio)
+    else:  # modelos entrenados antes de la calibración: porcentaje fijo
+        margen = max(0.05, bundle["error_relativo"] + extra)
+        p_min, p_max = precio * (1 - margen), precio * (1 + margen)
     resultado = {
         "precio": round(precio / 100) * 100,
-        "precio_min": round(precio * (1 - margen) / 100) * 100,
-        "precio_max": round(precio * (1 + margen) / 100) * 100,
+        "precio_min": round(p_min / 100) * 100,
+        "precio_max": round(p_max / 100) * 100,
         "precio_m2": round(precio / datos["area_construida"]),
         "margen": margen,
         "multiplicador": mult,
@@ -452,3 +512,86 @@ def eliminar_propiedad(p) -> None:
     db.session.commit()
     for nombre in nombres:
         borrar_archivo_foto(nombre)
+
+
+# ------------------------------------------------- monitoreo contra ventas reales
+def registrar_evaluacion(datos: dict, precio_real: float, *, origen: str, propiedad_id: int | None = None) -> EvaluacionVenta:
+    """Estima ``datos`` con el modelo activo y lo compara con el precio real de venta."""
+    est = estimar(datos, con_factores=False)
+    ev = EvaluacionVenta(
+        propiedad_id=propiedad_id, modelo_version=est["modelo"].version, origen=origen,
+        datos={c: datos[c] for c in FEATURE_COLUMNS}, precio_estimado=est["precio"],
+        precio_min=est["precio_min"], precio_max=est["precio_max"], precio_real=float(precio_real),
+    )
+    db.session.add(ev)
+    return ev
+
+
+def evaluar_ventas_csv(contenido: bytes, *, max_filas: int = 1000) -> dict:
+    """Evalúa un CSV de ventas cerradas con el modelo activo (no las agrega al entrenamiento)."""
+    df = _leer_csv(contenido, max_filas)
+    validos, errores = _filas_validas(df)
+    if not validos:
+        raise ValueError("Ningún registro del archivo es válido. Primer error: " + (errores[0] if errores else "—"))
+    for fila in validos:
+        registrar_evaluacion(fila, fila["precio"], origen="csv")
+    db.session.commit()
+    return {"evaluados": len(validos), "omitidos": len(errores), "errores": errores[:25]}
+
+
+def resumen_monitoreo() -> dict | None:
+    """Indicadores del error real del modelo frente a ventas cerradas (None si no hay datos)."""
+    filas = EvaluacionVenta.query.order_by(EvaluacionVenta.id.asc()).all()
+    if not filas:
+        return None
+
+    def indicadores(grupo):
+        rel = [e.error_relativo for e in grupo]
+        absr = [abs(x) for x in rel]
+        ordenados = sorted(absr)
+        mediana = (ordenados[len(ordenados) // 2] + ordenados[(len(ordenados) - 1) // 2]) / 2
+        return {
+            "n": len(grupo), "mape": sum(absr) / len(absr) * 100, "mdape": mediana * 100,
+            "sesgo": sum(rel) / len(rel) * 100, "mae": sum(abs(e.precio_estimado - e.precio_real) for e in grupo) / len(grupo),
+            "dentro": sum(e.dentro_del_rango for e in grupo) / len(grupo) * 100,
+        }
+
+    por_version = {}
+    for e in filas:
+        por_version.setdefault(e.modelo_version, []).append(e)
+    res = indicadores(filas)
+    res["por_version"] = {v: indicadores(g) for v, g in sorted(por_version.items())}
+    return res
+
+
+# 10 viviendas típicas de Arequipa para probar la tasación con el modelo activo
+TASACIONES_EJEMPLO = [
+    ("Casa", "Yanahuara", 220, 260, 5, 4, 3, 8, "Bueno", "Alta calidad", 2, 1, 0, 0, 1, 1, 1, 1, 1),
+    ("Departamento", "Cayma", 0, 110, 3, 2, 1, 5, "Excelente", "Estándar", 1, 0, 0, 1, 1, 1, 0, 1, 1),
+    ("Casa", "Cerro Colorado", 160, 180, 4, 3, 2, 12, "Regular", "Estándar", 1, 1, 0, 0, 0, 1, 0, 1, 1),
+    ("Departamento", "Arequipa (Cercado)", 0, 85, 2, 1, 1, 20, "Regular", "Básico", 0, 0, 0, 0, 0, 1, 1, 1, 1),
+    ("Dúplex", "José Luis Bustamante y Rivero", 140, 190, 4, 3, 2, 6, "Bueno", "Alta calidad", 2, 0, 0, 0, 1, 1, 1, 1, 1),
+    ("Casa", "Sachaca", 300, 240, 5, 4, 2, 4, "Excelente", "Lujo", 3, 1, 1, 0, 1, 0, 0, 1, 0),
+    ("Departamento", "Miraflores", 0, 95, 3, 2, 1, 15, "Bueno", "Estándar", 1, 0, 0, 1, 0, 1, 1, 1, 1),
+    ("Casa", "Paucarpata", 120, 140, 3, 2, 2, 25, "Regular", "Básico", 0, 0, 0, 0, 0, 1, 0, 1, 1),
+    ("Casa", "Socabaya", 200, 150, 4, 3, 2, 10, "Bueno", "Estándar", 1, 1, 0, 0, 0, 1, 0, 1, 1),
+    ("Departamento", "Alto Selva Alegre", 0, 75, 2, 1, 1, 10, "Bueno", "Básico", 0, 0, 0, 0, 0, 1, 0, 1, 1),
+]
+
+
+def cargar_tasaciones_ejemplo(usuario_id: int) -> int:
+    """Tasa 10 viviendas de ejemplo con el modelo activo y las guarda en el historial.
+
+    Es repetible: no duplica una vivienda que el usuario ya tiene tasada con los mismos datos.
+    """
+    from .ml.constants import FEATURE_COLUMNS
+
+    existentes = [t.datos for t in Tasacion.query.filter_by(usuario_id=usuario_id).all()]
+    creadas = 0
+    for fila in TASACIONES_EJEMPLO:
+        datos = dict(zip(FEATURE_COLUMNS, fila))
+        if any(e == datos for e in existentes):
+            continue
+        registrar_tasacion(usuario_id, datos, estimar(datos))
+        creadas += 1
+    return creadas

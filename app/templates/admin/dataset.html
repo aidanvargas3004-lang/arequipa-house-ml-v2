@@ -38,6 +38,39 @@
   </form>
 </div>
 
+{% if calidad.total %}
+<div class="card mb-5">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h2 class="font-semibold text-slate-900">Calidad de los datos</h2>
+      <p class="text-sm text-slate-600">
+        {% if calidad.detectados %}Se detectaron <strong>{{ calidad.detectados }}</strong> registros atípicos de {{ '{:,}'.format(calidad.total) }} ({{ calidad.porcentaje }} %): su precio por m² es muy distinto al de su zona.
+        {% for motivo, n in calidad.por_motivo.items() %}<span class="rounded bg-slate-100 px-2 py-1 text-xs">{{ motivo }}: {{ n }}</span>{% endfor %}
+        {% else %}No se detectaron registros atípicos en {{ '{:,}'.format(calidad.total) }} registros.{% endif %}
+      </p>
+      <p class="text-xs text-slate-500">Al entrenar, el sistema puede excluirlos automáticamente (opción «Excluir registros atípicos» en Modelos). Revísalos antes de eliminarlos: un registro atípico puede ser un error de captura, pero también una vivienda excepcional.</p>
+    </div>
+    {% if calidad.detectados %}
+    <form method="post" action="{{ url_for('admin.dataset_eliminar_atipicos') }}" data-confirm="¿Eliminar del dataset los {{ calidad.detectados }} registros atípicos? No se puede deshacer.">{{ m.csrf() }}<button class="btn btn-outline btn-sm text-red-600">Eliminar los {{ calidad.detectados }} atípicos</button></form>
+    {% endif %}
+  </div>
+  {% if calidad.filas %}
+  <div class="mt-3 overflow-x-auto">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+      <thead class="bg-slate-50"><tr><th class="th">ID</th><th class="th">Vivienda</th><th class="th">Precio</th><th class="th">S/ m²</th><th class="th">Típico de su zona</th><th class="th">Motivo</th><th class="th"></th></tr></thead>
+      <tbody class="divide-y divide-slate-100">
+      {% for r in calidad.filas %}
+        <tr><td class="td">{{ r.id }}</td><td class="td">{{ r.tipo }} · {{ r.distrito }} · {{ r.area|m2 }}</td><td class="td font-semibold text-blue-900">{{ r.precio|soles }}</td><td class="td">{{ r.precio_m2|soles }}</td><td class="td text-slate-500">{{ r.referencia_m2|soles }}</td><td class="td text-xs">{{ r.motivo }}</td>
+        <td class="td text-right"><a class="btn btn-outline btn-sm" href="{{ url_for('admin.dataset_form', registro_id=r.id) }}">Editar</a></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if calidad.detectados > calidad.filas|length %}<p class="mt-2 text-xs text-slate-500">Se muestran los {{ calidad.filas|length }} más extremos.</p>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
 <form method="get" class="mb-4 flex flex-wrap items-end gap-2">
   {{ m.selector('origen', 'Origen', origen_etiqueta.keys()|list, filtros.get('origen',''), 'Todos') }}
   {{ m.selector('tipo', 'Tipo', TIPOS, filtros.get('tipo',''), 'Todos') }}

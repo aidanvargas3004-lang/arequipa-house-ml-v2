@@ -57,6 +57,7 @@ class Config:
     ML_SYNTHETIC_ROWS = int(os.environ.get("ML_SYNTHETIC_ROWS", "4000"))
     ML_N_JOBS = int(os.environ.get("ML_N_JOBS", "1"))
     ML_RANDOM_STATE = 42
+    ML_EXCLUIR_ATIPICOS = os.environ.get("ML_EXCLUIR_ATIPICOS", "1") == "1"  # depura el dataset al entrenar
 
     # Seguridad de acceso
     MAX_FAILED_LOGINS = 5

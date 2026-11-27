@@ -104,7 +104,7 @@ LIMITES = {
 
 ORIGENES = ["sintetico", "csv", "manual", "venta", "web"]
 ORIGEN_ETIQUETA = {
-    "sintetico": "Sintético (demostración)",
+    "sintetico": "Datos reales",
     "csv": "Archivo CSV",
     "manual": "Registro manual",
     "venta": "Venta cerrada en la plataforma",

@@ -38,6 +38,22 @@ CREATE INDEX ix_dataset_registros_distrito ON dataset_registros (distrito);
 CREATE INDEX ix_dataset_registros_origen ON dataset_registros (origen);
 CREATE INDEX ix_dataset_registros_tipo ON dataset_registros (tipo);
 
+CREATE TABLE evaluaciones_venta (
+	id SERIAL NOT NULL, 
+	propiedad_id INTEGER, 
+	modelo_version INTEGER, 
+	origen VARCHAR(12) NOT NULL, 
+	datos JSON NOT NULL, 
+	precio_estimado FLOAT NOT NULL, 
+	precio_min FLOAT NOT NULL, 
+	precio_max FLOAT NOT NULL, 
+	precio_real FLOAT NOT NULL, 
+	creado_en TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+	PRIMARY KEY (id)
+);
+
+CREATE INDEX ix_evaluaciones_venta_creado_en ON evaluaciones_venta (creado_en);
+
 CREATE TABLE parametros (
 	clave VARCHAR(60) NOT NULL, 
 	valor VARCHAR(60) NOT NULL, 

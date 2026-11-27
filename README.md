@@ -184,7 +184,7 @@ flask --app wsgi bootstrap
 gunicorn wsgi:app --workers 1 --threads 4 --timeout 120
 ```
 
-**Creación manual con pgAdmin:** ejecuta [`docs/01_crear_base_postgresql.sql`](docs/01_crear_base_postgresql.sql) (usuario y base) y luego [`docs/02_tablas_postgresql.sql`](docs/02_tablas_postgresql.sql) (11 tablas, conectado a `arequipa_house`). También puedes omitirlos: la aplicación crea las tablas sola al iniciar.
+**Creación manual con pgAdmin:** ejecuta [`docs/01_crear_base_postgresql.sql`](docs/01_crear_base_postgresql.sql) (usuario y base) y luego [`docs/02_tablas_postgresql.sql`](docs/02_tablas_postgresql.sql) (12 tablas, conectado a `arequipa_house`). También puedes omitirlos: la aplicación crea las tablas sola al iniciar.
 
 El esquema SQL de PostgreSQL está en [`docs/schema_postgresql.sql`](docs/schema_postgresql.sql) y el diagrama ER + diccionario de datos en [`docs/modelo_datos.md`](docs/modelo_datos.md) (se regeneran con `PYTHONPATH=. python scripts/export_schema.py`).
 
@@ -217,8 +217,21 @@ También puedes levantar todo con PostgreSQL local: `docker compose up --build` 
 flask --app wsgi bootstrap            # tablas + parámetros + admin + dataset + modelo (idempotente)
 flask --app wsgi train                # entrena y activa una nueva versión (síncrono)
 flask --app wsgi seed-demo            # usuarios y publicaciones de demostración
+flask --app wsgi seed-tasaciones      # 10 tasaciones de ejemplo con el modelo activo (tabla tasaciones)
 flask --app wsgi create-admin correo@dominio.pe
 ```
+
+## Calidad de datos, rango calibrado y monitoreo
+
+Tres mejoras pensadas para trabajar con datos reales (anuncios), que traen ruido y errores de captura:
+
+1. **Control de calidad del dataset** (`app/ml/calidad.py`). En **Administración → Dataset** hay una tarjeta «Calidad de los datos» que lista los registros *atípicos*: su precio por m² es muy distinto al de su zona (mismo tipo y distrito), medido con un puntaje robusto basado en la mediana y la MAD (umbral 3,5) y con límites absolutos plausibles (S/ 300 a 30 000 por m²). Al entrenar, la casilla **Excluir registros atípicos** (activa por defecto; variable `ML_EXCLUIR_ATIPICOS`) los aparta; nunca se descarta más del 10 % ni se deja menos de 60 registros. Cada modelo guarda cuántos se excluyeron.
+2. **Rango probable calibrado.** En lugar de un porcentaje fijo, el rango se calibra con los errores reales del modelo en el conjunto de validación (cuantiles del error relativo, por tipo de vivienda) para cubrir el 80 % de los casos. La cobertura medida en el conjunto de prueba se muestra en el detalle del modelo y en el resultado de la tasación. El parámetro `margen_extra` sigue ensanchando el rango.
+3. **Monitoreo contra ventas reales** (**Administración → Monitoreo**). Compara lo que estimó el sistema con el precio al que se vendió una vivienda: error medio y mediano, sesgo, porcentaje de ventas dentro del rango y desglose por versión del modelo. Se alimenta solo cuando un vendedor marca una vivienda como vendida, o desde el panel (una venta o un CSV de ventas cerradas). Estas ventas **no** se agregan al entrenamiento salvo que se marque expresamente.
+
+La tabla nueva `evaluaciones_venta` se crea sola al iniciar el sistema (no requiere migrar la base existente).
+
+`scripts/demo_mejoras.py` reproduce con números el efecto sobre datos sintéticos con errores de captura inyectados (`PYTHONPATH=. python scripts/demo_mejoras.py`).
 
 ## Pruebas
 
@@ -228,7 +241,7 @@ python -m pytest -q                                                    # SQLite 
 TEST_DATABASE_URL=postgresql://u:p@localhost:5432/prueba python -m pytest -q   # PostgreSQL
 ```
 
-66 pruebas cubren el pipeline de ML, validación, autenticación y roles, bloqueo por intentos, CSRF, XSS, subida de archivos, moderación, mensajes, visitas, importación CSV, captura asistida de anuncios, recomendaciones KNN, segmentación K-Means, publicación del administrador, reentrenamiento (incluido en segundo plano), parámetros y autoreparación del modelo. El workflow de GitHub Actions las corre con SQLite y PostgreSQL.
+77 pruebas cubren el pipeline de ML, validación, autenticación y roles, bloqueo por intentos, CSRF, XSS, subida de archivos, moderación, mensajes, visitas, importación CSV, captura asistida de anuncios, recomendaciones KNN, segmentación K-Means, publicación del administrador, reentrenamiento (incluido en segundo plano), parámetros y autoreparación del modelo, control de calidad de datos, rango probable calibrado y monitoreo contra ventas reales. El workflow de GitHub Actions las corre con SQLite y PostgreSQL.
 
 El CSS de Tailwind ya está compilado en `app/static/css/tailwind.css`. Solo si cambias clases de las plantillas: `npm install && npm run build:css`.
 

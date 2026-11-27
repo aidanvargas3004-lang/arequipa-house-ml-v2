@@ -20,7 +20,7 @@ def test_flujo_completo_de_tasacion(app):
     assert detalle.status_code == 200
     html = detalle.get_data(as_text=True)
     assert "Precio estimado de venta" in html and "S/" in html and "Factores que influyeron" in html
-    assert "datos sintéticos" in html  # transparencia sobre el origen de los datos
+    assert "datos sintéticos" not in html and "bg-amber-50" not in html  # sin avisos amarillos
     with app.app_context():
         t = Tasacion.query.one()
         assert t.precio_min < t.precio_estimado < t.precio_max and t.precio_m2 > 0 and t.factores
@@ -66,3 +66,26 @@ def test_mas_area_mas_precio(app):
     p1 = c.post("/api/tasar", data={**VIVIENDA, "area_construida": "70"}).get_json()["precio"]
     p2 = c.post("/api/tasar", data={**VIVIENDA, "area_construida": "180"}).get_json()["precio"]
     assert p2 > p1
+
+
+def test_tasaciones_de_ejemplo_se_guardan_y_no_se_duplican(app):
+    from app import services
+    from app.models import Tasacion
+    from tests.conftest import crear_usuario
+
+    uid = crear_usuario(app, "administrador", email="ejemplo@test.pe")
+    with app.app_context():
+        assert services.cargar_tasaciones_ejemplo(uid) == 10
+        assert services.cargar_tasaciones_ejemplo(uid) == 0  # repetirlo no duplica
+        filas = Tasacion.query.filter_by(usuario_id=uid).all()
+        assert len(filas) == 10
+        assert all(t.precio_min < t.precio_estimado < t.precio_max for t in filas)
+
+
+def test_pantallas_sin_avisos_amarillos_de_datos_sinteticos(app):
+    from tests.conftest import cliente_con_rol
+
+    admin = cliente_con_rol(app, "administrador", email="aviso@test.pe")
+    for ruta in ("/admin/", "/tasar", "/admin/segmentos"):
+        html = admin.get(ruta).get_data(as_text=True)
+        assert "datos sintéticos" not in html and "bg-amber-50" not in html

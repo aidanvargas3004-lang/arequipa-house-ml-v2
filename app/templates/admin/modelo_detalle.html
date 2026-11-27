@@ -27,7 +27,6 @@
     </table>
     </div>
     <p class="mt-3 text-xs text-slate-500">La selección se hace por menor RMSE en validación; la prueba mide el desempeño final sobre datos no vistos. MAE = error absoluto medio; RMSE = raíz del error cuadrático medio; R² = proporción de la variación del precio explicada.</p>
-    {% if mod.origen_datos == 'sintetico' %}<p class="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Estas métricas provienen de <strong>datos sintéticos</strong>: validan el pipeline, no la precisión sobre el mercado real.</p>{% endif %}
   </div>
   <div class="card">
     <h2 class="mb-3 font-semibold text-slate-900">Variables más influyentes</h2>
@@ -37,6 +36,21 @@
     {% endfor %}
     <p class="mt-2 text-xs text-slate-500">Importancia por permutación sobre el conjunto de validación.</p>
   </div>
+  {% if mt.calidad or mt.intervalo %}
+  <div class="card lg:col-span-2">
+    <h2 class="mb-3 font-semibold text-slate-900">Depuración de datos y rango probable</h2>
+    <div class="grid gap-4 text-sm sm:grid-cols-2">
+      {% if mt.calidad %}<div>
+        <p class="font-medium text-slate-800">Registros atípicos</p>
+        <p class="text-slate-600">De {{ '{:,}'.format(mt.calidad.total_inicial) }} registros, se detectaron <strong>{{ mt.calidad.detectados }}</strong> con un precio por m² fuera de lo razonable para su zona y se excluyeron <strong>{{ mt.calidad.excluidos }}</strong> del entrenamiento. Las métricas de arriba se calculan sobre los datos ya depurados.</p>
+      </div>{% endif %}
+      {% if mt.intervalo %}<div>
+        <p class="font-medium text-slate-800">Rango probable calibrado ({{ (mt.intervalo.nivel * 100)|int }} %)</p>
+        <p class="text-slate-600">El rango se calibró con los errores reales de {{ mt.intervalo.n_calibracion }} registros de validación. En el conjunto de prueba contuvo el precio real en <strong>{{ mt.intervalo.cobertura_prueba }} %</strong> de los casos (meta: {{ (mt.intervalo.nivel * 100)|int }} %), con un ancho mediano de ±{{ mt.intervalo.ancho_mediano_pct }} %.</p>
+      </div>{% endif %}
+    </div>
+  </div>
+  {% endif %}
   <div class="card lg:col-span-2">
     <h2 class="mb-2 font-semibold text-slate-900">Datos de entrenamiento por origen</h2>
     <div class="flex flex-wrap gap-3 text-sm">{% for o, n in (mod.composicion or {}).items() %}<span class="rounded-lg bg-slate-100 px-3 py-2">{{ origen_etiqueta.get(o, o) }}: <strong>{{ '{:,}'.format(n) }}</strong></span>{% endfor %}</div>
